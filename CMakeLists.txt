@@ -13,6 +13,7 @@ set(CMAKE_C_STANDARD 17)
 
 include_directories(
     include/
+    D:/VulkanSDK/Include
 )
 
 # Gather source files excluding stb.cpp
@@ -43,6 +44,7 @@ add_executable(${PROJECT_NAME}
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/glfw3.lib
+        D:/VulkanSDK/Lib/vulkan-1.lib
         gdi32
         user32
     )

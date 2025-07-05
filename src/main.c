@@ -1,9 +1,15 @@
+#define GLFW_INCLUDE_VULKAN
 #include <sulkan/sulkan.h>
 #include <stdio.h>
 
 int main(int argc, char** argv)
 {
-    skWindow window = skWindow_Create("Sulkan", 1920, 1080, false, false);
+    skWindow window = skWindow_Create("Sulkan", 800, 600, false, false);
+
+    unsigned int extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
+
+    printf("Extensions support: %d\n", extensionCount);
 
     while (!skWindow_ShouldClose(&window))
     {
