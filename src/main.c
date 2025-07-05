@@ -11,6 +11,8 @@ int main(int argc, char** argv)
 
     printf("Extensions support: %d\n", extensionCount);
 
+    skRenderer renderer = skRenderer_Create();
+
     while (!skWindow_ShouldClose(&window))
     {
         

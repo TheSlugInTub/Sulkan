@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-skWindow skWindow_Create(const char* title, int width, int height,
+skWindow skWindow_Create(const char* title, i16 width, i16 height,
                          Bool fullscreen, Bool maximize)
 {
     skWindow window;
@@ -12,7 +12,7 @@ skWindow skWindow_Create(const char* title, int width, int height,
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);

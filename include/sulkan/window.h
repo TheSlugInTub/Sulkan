@@ -6,13 +6,13 @@
 typedef struct
 {
     const char*        title;
-    int                width;
-    int                height;
+    i16                width;
+    i16                height;
     struct GLFWwindow* window;
 } skWindow;
 
 // Initialize a GLFW window and OpenGL context
-skWindow skWindow_Create(const char* title, int width, int height,
+skWindow skWindow_Create(const char* title, i16 width, i16 height,
                          Bool fullscreen, Bool maximize);
 
 // Is the window closed or not? Useful for running a game loop
