@@ -6,12 +6,7 @@ int main(int argc, char** argv)
 {
     skWindow window = skWindow_Create("Sulkan", 800, 600, false, false);
 
-    unsigned int extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
-
-    printf("Extensions support: %d\n", extensionCount);
-
-    skRenderer renderer = skRenderer_Create();
+    skRenderer renderer = skRenderer_Create(&window);
 
     while (!skWindow_ShouldClose(&window))
     {

@@ -21,6 +21,9 @@ int skVector_PushBack(skVector* vector, const void* element);
 // Get the data at an index of the vector
 void* skVector_Get(skVector* vector, size_t index);
 
+// Resizes a vector, allocating memory for [new_size] elements
+int skVector_Resize(skVector* vector, size_t new_size);
+
 // Remove an element from the vector by index
 int skVector_Remove(skVector* vector, size_t index);
 
