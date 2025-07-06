@@ -20,6 +20,7 @@ skRenderer skRenderer_Create()
     appInfo.pEngineName = "Sulkan";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
+
     VkInstanceCreateInfo createInfo = {0};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -41,16 +42,24 @@ skRenderer skRenderer_Create()
     
     u32 deviceCount = 0;
 
-    skVector* physicalDevices;
-    physicalDevices =
-        skVector_Create(sizeof(VkPhysicalDevice), 1);
-    vkEnumeratePhysicalDevices(renderer.instance, &deviceCount,
-                               physicalDevices->data[0]);
+    // First call: get the number of devices
+    vkEnumeratePhysicalDevices(renderer.instance, &deviceCount, NULL);
     
     if (deviceCount == 0)
     {
         printf("SK ERROR: No physical device found.\n");
+        return renderer;
     }
+
+    // Create vector with the correct size
+    skVector* physicalDevices = skVector_Create(sizeof(VkPhysicalDevice), deviceCount);
+    
+    // Second call: get the actual devices
+    vkEnumeratePhysicalDevices(renderer.instance, &deviceCount, 
+                               (VkPhysicalDevice*)physicalDevices->data);
+    
+    // Update the vector's size to reflect the actual number of devices
+    physicalDevices->size = deviceCount;
 
     for (int i = 0; i < physicalDevices->size; i++)
     {
@@ -61,6 +70,7 @@ skRenderer skRenderer_Create()
         if (skRenderer_IsDeviceSuitable(&renderer, device))
         {
             renderer.physicalDevice = device;
+            break; // Found a suitable device, no need to continue
         }
     }
 
