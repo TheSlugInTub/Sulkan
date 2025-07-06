@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 
     while (!skWindow_ShouldClose(&window))
     {
-        
+        skRenderer_DrawFrame(&renderer);
 
         skWindow_Update(&window);
     }

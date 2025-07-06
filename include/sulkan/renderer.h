@@ -57,8 +57,14 @@ typedef struct skRenderer
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
     VkInstance instance;
 } skRenderer;
 
 skRenderer skRenderer_Create(skWindow* window);
-void skRenderer_Destroy();
+void skRenderer_DrawFrame(skRenderer* renderer);
+void skRenderer_Destroy(skRenderer* renderer);

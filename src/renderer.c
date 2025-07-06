@@ -681,6 +681,19 @@ void skRenderer_CreateRenderPass(skRenderer* renderer)
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
 
+    VkSubpassDependency dependency = {0};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
     if (vkCreateRenderPass(renderer->device, &renderPassInfo, NULL,
                            &renderer->renderPass) != VK_SUCCESS)
     {
@@ -722,6 +735,175 @@ void skRenderer_CreateFrameBuffers(skRenderer* renderer)
             printf("SK ERROR: Failed to create framebuffer.");
         }
     }
+}
+
+void skRenderer_CreateCommandBuffer(skRenderer* renderer)
+{
+    VkCommandBufferAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = renderer->commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(renderer->device, &allocInfo,
+                                 &renderer->commandBuffer) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate command buffers.");
+    }
+}
+
+void skRenderer_CreateCommandPool(skRenderer* renderer)
+{
+    skQueueFamilyIndices indices = skFindQueueFamilies(
+        renderer->physicalDevice, renderer->surface);
+
+    VkCommandPoolCreateInfo poolInfo = {0};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = indices.graphicsFamily;
+
+    if (vkCreateCommandPool(renderer->device, &poolInfo, NULL,
+                            &renderer->commandPool) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create command pool.");
+    }
+}
+
+void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
+                                    VkCommandBuffer commandBuffer,
+                                    u32             imageIndex)
+{
+    VkCommandBufferBeginInfo beginInfo = {0};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = NULL;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to begin recording command buffer.");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo = {0};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderer->renderPass;
+    renderPassInfo.framebuffer = *(VkFramebuffer*)skVector_Get(
+        renderer->swapchainFramebuffers, imageIndex);
+
+    renderPassInfo.renderArea.offset = (VkOffset2D) {0, 0};
+    renderPassInfo.renderArea.extent = renderer->swapchainExtent;
+
+    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      renderer->pipeline);
+
+    VkViewport viewport = {0};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)(renderer->swapchainExtent.width);
+    viewport.height = (float)(renderer->swapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = {0};
+    scissor.offset = (VkOffset2D) {0, 0};
+    scissor.extent = renderer->swapchainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to record command buffer.");
+    }
+}
+
+void skRenderer_CreateSyncObjects(skRenderer* renderer)
+{
+    VkSemaphoreCreateInfo semaphoreInfo = {0};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo = {0};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
+                          &renderer->imageAvailableSemaphore) !=
+            VK_SUCCESS ||
+        vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
+                          &renderer->renderFinishedSemaphore) !=
+            VK_SUCCESS ||
+        vkCreateFence(renderer->device, &fenceInfo, NULL,
+                      &renderer->inFlightFence) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create semaphores.\n");
+    }
+}
+
+void skRenderer_DrawFrame(skRenderer* renderer)
+{
+    vkWaitForFences(renderer->device, 1, &renderer->inFlightFence,
+                    VK_TRUE, UINT64_MAX);
+    vkResetFences(renderer->device, 1, &renderer->inFlightFence);
+
+    u32 imageIndex;
+    vkAcquireNextImageKHR(renderer->device, renderer->swapchain,
+                          UINT64_MAX,
+                          renderer->imageAvailableSemaphore,
+                          VK_NULL_HANDLE, &imageIndex);
+
+    vkResetCommandBuffer(renderer->commandBuffer, 0);
+
+    skRenderer_RecordCommandBuffer(renderer, renderer->commandBuffer,
+                                   imageIndex);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {
+        renderer->imageAvailableSemaphore};
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &renderer->commandBuffer;
+
+    VkSemaphore signalSemaphores[] = {
+        renderer->renderFinishedSemaphore};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
+                      renderer->inFlightFence) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to submit draw command buffer.");
+    }
+
+    VkPresentInfoKHR presentInfo = {0};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {renderer->swapchain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = NULL;
+
+    vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
 }
 
 skRenderer skRenderer_Create(skWindow* window)
@@ -946,6 +1128,9 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateRenderPass(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateFrameBuffers(&renderer);
+    skRenderer_CreateCommandPool(&renderer);
+    skRenderer_CreateCommandBuffer(&renderer);
+    skRenderer_CreateSyncObjects(&renderer);
 
     return renderer;
 }
