@@ -1331,53 +1331,119 @@ u32 skRenderer_FindMemoryType(skRenderer* renderer, u32 typeFilter,
     return -1;
 }
 
-void skRenderer_CreateVertexBuffer(skRenderer* renderer)
+void skRenderer_CreateBuffer(skRenderer* renderer, size_t size,
+                             VkBufferUsageFlags    usage,
+                             VkMemoryPropertyFlags properties,
+                             VkBuffer*             buffer,
+                             VkDeviceMemory*       bufferMemory)
 {
-    const skVertex vertices[] = {{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                 {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                 {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-
     VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices[0]) * 3;
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(renderer->device, &bufferInfo, NULL,
-                       &renderer->vertexBuffer) != VK_SUCCESS)
+    if (vkCreateBuffer(renderer->device, &bufferInfo, NULL, buffer) !=
+        VK_SUCCESS)
     {
-        printf("SK ERROR: Failed to create vertex buffer.");
+        printf("SK ERROR: Failed to create buffer.\n");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(
-        renderer->device, renderer->vertexBuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(renderer->device, *buffer,
+                                  &memRequirements);
 
     VkMemoryAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
-        renderer, memRequirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        renderer, memRequirements.memoryTypeBits, properties);
 
     if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
-                         &renderer->vertexBufferMemory) != VK_SUCCESS)
+                         bufferMemory) != VK_SUCCESS)
     {
-        printf(
-            "SK ERROR: Failed to allocate vertex buffer memory.\n");
+        printf("SK ERROR: Failed to allocate buffer memory.");
     }
 
-    vkBindBufferMemory(renderer->device, renderer->vertexBuffer,
-                       renderer->vertexBufferMemory, 0);
+    vkBindBufferMemory(renderer->device, *buffer, *bufferMemory, 0);
+}
+
+void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
+                           VkBuffer dstBuffer, VkDeviceSize size)
+{
+    VkCommandBufferAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = renderer->commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(renderer->device, &allocInfo,
+                             &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo = {0};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion = {0};
+    copyRegion.srcOffset = 0; // Optional
+    copyRegion.dstOffset = 0; // Optional
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1,
+                    &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
+                  VK_NULL_HANDLE);
+    vkQueueWaitIdle(renderer->graphicsQueue);
+
+    vkFreeCommandBuffers(renderer->device, renderer->commandPool, 1,
+                         &commandBuffer);
+}
+
+void skRenderer_CreateVertexBuffer(skRenderer* renderer)
+{
+    const skVertex vertices[] = {{{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+                                 {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+                                 {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+
+    size_t bufferSize = sizeof(vertices[0]) * 3;
+
+    VkBuffer       stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &stagingBuffer, &stagingMemory);
 
     void* data;
-    vkMapMemory(renderer->device, renderer->vertexBufferMemory, 0,
-                bufferInfo.size, 0, &data);
+    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
+                &data);
 
     memcpy(data, vertices, sizeof(vertices[0]) * 3);
 
-    vkUnmapMemory(renderer->device, renderer->vertexBufferMemory);
+    vkUnmapMemory(renderer->device, stagingMemory);
+
+    skRenderer_CreateBuffer(
+        renderer, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &renderer->vertexBuffer, &renderer->vertexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, stagingBuffer,
+                          renderer->vertexBuffer, bufferSize);
+
+    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
+    vkFreeMemory(renderer->device, stagingMemory, NULL);
 }
 
 skRenderer skRenderer_Create(skWindow* window)
