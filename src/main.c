@@ -1,4 +1,3 @@
-#define GLFW_INCLUDE_VULKAN
 #include <sulkan/sulkan.h>
 #include <stdio.h>
 
@@ -15,6 +14,7 @@ int main(int argc, char** argv)
         skWindow_Update(&window);
     }
 
+    skRenderer_Destroy(&renderer);
     skWindow_Close(&window);
 
     return 0;

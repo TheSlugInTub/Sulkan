@@ -3,12 +3,14 @@
 #include <GLFW/glfw3.h>
 #include <sulkan/essentials.h>
 
+
 typedef struct
 {
     const char*        title;
     i16                width;
     i16                height;
     struct GLFWwindow* window;
+    Bool framebufferResized;
 } skWindow;
 
 // Initialize a GLFW window and OpenGL context

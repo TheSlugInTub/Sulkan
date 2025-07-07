@@ -2,6 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void skWindow_FramebufferSizeCallback(GLFWwindow* window, int height,
+                                      int width)
+{
+    skWindow* win = (skWindow*)(glfwGetWindowUserPointer(window));
+    win->framebufferResized = true;
+}
+
 skWindow skWindow_Create(const char* title, i16 width, i16 height,
                          Bool fullscreen, Bool maximize)
 {
@@ -31,7 +38,10 @@ skWindow skWindow_Create(const char* title, i16 width, i16 height,
     }
 
     glfwMakeContextCurrent(window.window);
-    
+    glfwSetWindowUserPointer(window.window, &window);
+    glfwSetFramebufferSizeCallback(window.window,
+                                   skWindow_FramebufferSizeCallback);
+
     if (maximize)
         glfwMaximizeWindow(window.window);
 

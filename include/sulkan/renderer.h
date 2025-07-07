@@ -9,6 +9,9 @@
 #include <sulkan/essentials.h>
 #include <sulkan/vector.h>
 #include <sulkan/window.h>
+#include <cglm/cglm.h>
+
+#define SK_FRAMES_IN_FLIGHT (2)
 
 typedef struct skSwapchainDetails
 {
@@ -31,17 +34,15 @@ typedef enum skShaderType
     skShaderType_Geometry
 } skShaderType;
 
-typedef struct skShader
+typedef struct skVertex 
 {
-    skShaderType type;
-} skShader;
-
-void skShader_Create(const char* filePath);
-
-void skShader_ReadFile();
+    vec2 pos;
+    vec3 colour;
+} skVertex;
 
 typedef struct skRenderer
 {
+    skWindow* window;
     VkPhysicalDevice physicalDevice;
     VkDevice device;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -58,10 +59,13 @@ typedef struct skRenderer
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
     VkCommandPool commandPool;
-    VkCommandBuffer commandBuffer;
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
-    VkFence inFlightFence;
+    skVector* commandBuffers; // VkCommandBuffer
+    skVector* imageAvailableSemaphores; // VkSemaphore
+    skVector* renderFinishedSemaphores; // VkSemaphore
+    skVector* inFlightFences; // VkFence
+    u32 currentFrame;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
     VkInstance instance;
 } skRenderer;
 

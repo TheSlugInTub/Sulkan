@@ -1,12 +1,49 @@
 #include <sulkan/renderer.h>
 #include <stdio.h>
 #include <assert.h>
+#include <synchapi.h>
 
 #ifdef DEBUG
 static const Bool enableValidationLayers = true;
 #else
 static const Bool enableValidationLayers = true;
 #endif
+
+VkVertexInputBindingDescription skVertex_GetBindingDescription()
+{
+    VkVertexInputBindingDescription description = {0};
+
+    description.binding = 0;
+    description.stride = sizeof(skVertex);
+    description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    return description;
+}
+
+typedef struct VkVertexInputAttributeDescriptions
+{
+    VkVertexInputAttributeDescription descriptions[2];
+} VkVertexInputAttributeDescriptions;
+
+VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
+{
+    VkVertexInputAttributeDescription descriptions[2] = {0};
+
+    descriptions[0].binding = 0;
+    descriptions[0].location = 0;
+    descriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    descriptions[0].offset = offsetof(skVertex, pos);
+
+    descriptions[1].binding = 0;
+    descriptions[1].location = 1;
+    descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    descriptions[1].offset = offsetof(skVertex, colour);
+
+    VkVertexInputAttributeDescriptions pair = {descriptions[0],
+                                               descriptions[1]};
+
+    return pair;
+}
 
 char* skReadFile(const char* filePath, u32* len)
 {
@@ -424,11 +461,19 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     VkPipelineShaderStageCreateInfo shaderStages[] = {
         vertShaderStageInfo, fragShaderStageInfo};
 
+    VkVertexInputBindingDescription bindingDescription =
+        skVertex_GetBindingDescription();
+    VkVertexInputAttributeDescriptions attributeDescriptions =
+        skVertex_GetAttributeDescription();
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
     vertexInputInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexAttributeDescriptions =
+        attributeDescriptions.descriptions;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 
     VkDynamicState dynamicStates[2] = {VK_DYNAMIC_STATE_VIEWPORT,
                                        VK_DYNAMIC_STATE_SCISSOR};
@@ -617,17 +662,17 @@ void skRenderer_CreateImageViews(skRenderer* renderer)
 
     for (int i = 0; i < renderer->swapchainImages->size; i++)
     {
-        VkImage swapchainImage =
-            *(VkImage*)skVector_Get(renderer->swapchainImages, i);
-
         skVector_PushBack(renderer->swapchainImageViews, &imageView);
+
+        VkImage* swapchainImage =
+            (VkImage*)skVector_Get(renderer->swapchainImages, i);
 
         VkImageView* swapchainImageView = (VkImageView*)skVector_Get(
             renderer->swapchainImageViews, i);
 
         VkImageViewCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = swapchainImage;
+        createInfo.image = *swapchainImage;
 
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = renderer->swapchainImageFormat;
@@ -706,11 +751,9 @@ void skRenderer_CreateFrameBuffers(skRenderer* renderer)
     renderer->swapchainFramebuffers =
         skVector_Create(sizeof(VkFramebuffer), 1);
 
-    VkFramebuffer framebuf = {0};
-
     for (size_t i = 0; i < renderer->swapchainImageViews->size; i++)
     {
-        skVector_PushBack(renderer->swapchainFramebuffers, &framebuf);
+        VkFramebuffer framebuf = {0};
 
         VkImageView attachments[1] = {0};
         attachments[0] = *(VkImageView*)skVector_Get(
@@ -727,26 +770,30 @@ void skRenderer_CreateFrameBuffers(skRenderer* renderer)
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(renderer->device, &framebufferInfo,
-                                NULL,
-                                (VkFramebuffer*)skVector_Get(
-                                    renderer->swapchainFramebuffers,
-                                    i)) != VK_SUCCESS)
+                                NULL, &framebuf) != VK_SUCCESS)
         {
             printf("SK ERROR: Failed to create framebuffer.");
         }
+
+        skVector_PushBack(renderer->swapchainFramebuffers, &framebuf);
     }
 }
 
-void skRenderer_CreateCommandBuffer(skRenderer* renderer)
+void skRenderer_CreateCommandBuffers(skRenderer* renderer)
 {
+    renderer->commandBuffers =
+        skVector_Create(sizeof(VkCommandBuffer), 2);
+    skVector_Resize(renderer->commandBuffers, SK_FRAMES_IN_FLIGHT);
+
     VkCommandBufferAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = renderer->commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    allocInfo.commandBufferCount = SK_FRAMES_IN_FLIGHT;
 
-    if (vkAllocateCommandBuffers(renderer->device, &allocInfo,
-                                 &renderer->commandBuffer) !=
+    if (vkAllocateCommandBuffers(
+            renderer->device, &allocInfo,
+            (VkCommandBuffer*)renderer->commandBuffers->data) !=
         VK_SUCCESS)
     {
         printf("SK ERROR: Failed to allocate command buffers.");
@@ -784,11 +831,13 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         printf("SK ERROR: Failed to begin recording command buffer.");
     }
 
+    VkFramebuffer framebuf = *(VkFramebuffer*)skVector_Get(
+        renderer->swapchainFramebuffers, imageIndex);
+
     VkRenderPassBeginInfo renderPassInfo = {0};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderer->renderPass;
-    renderPassInfo.framebuffer = *(VkFramebuffer*)skVector_Get(
-        renderer->swapchainFramebuffers, imageIndex);
+    renderPassInfo.framebuffer = framebuf;
 
     renderPassInfo.renderArea.offset = (VkOffset2D) {0, 0};
     renderPassInfo.renderArea.extent = renderer->swapchainExtent;
@@ -817,6 +866,11 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     scissor.extent = renderer->swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+    VkBuffer     vertexBuffers[] = {renderer->vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
+                           offsets);
+
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
@@ -829,6 +883,18 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
 void skRenderer_CreateSyncObjects(skRenderer* renderer)
 {
+    renderer->imageAvailableSemaphores =
+        skVector_Create(sizeof(VkSemaphore), SK_FRAMES_IN_FLIGHT);
+    skVector_Resize(renderer->imageAvailableSemaphores,
+                    SK_FRAMES_IN_FLIGHT);
+    renderer->renderFinishedSemaphores =
+        skVector_Create(sizeof(VkSemaphore), SK_FRAMES_IN_FLIGHT);
+    skVector_Resize(renderer->renderFinishedSemaphores,
+                    SK_FRAMES_IN_FLIGHT);
+    renderer->inFlightFences =
+        skVector_Create(sizeof(VkFence), SK_FRAMES_IN_FLIGHT);
+    skVector_Resize(renderer->inFlightFences, SK_FRAMES_IN_FLIGHT);
+
     VkSemaphoreCreateInfo semaphoreInfo = {0};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -836,41 +902,139 @@ void skRenderer_CreateSyncObjects(skRenderer* renderer)
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if (vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
-                          &renderer->imageAvailableSemaphore) !=
-            VK_SUCCESS ||
-        vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
-                          &renderer->renderFinishedSemaphore) !=
-            VK_SUCCESS ||
-        vkCreateFence(renderer->device, &fenceInfo, NULL,
-                      &renderer->inFlightFence) != VK_SUCCESS)
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
     {
-        printf("SK ERROR: Failed to create semaphores.\n");
+        VkFence* fence = skVector_Get(renderer->inFlightFences, i);
+        VkSemaphore* sema1 =
+            skVector_Get(renderer->imageAvailableSemaphores, i);
+        VkSemaphore* sema2 =
+            skVector_Get(renderer->renderFinishedSemaphores, i);
+
+        if (vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
+                              sema1) != VK_SUCCESS ||
+            vkCreateSemaphore(renderer->device, &semaphoreInfo, NULL,
+                              sema2) != VK_SUCCESS ||
+            vkCreateFence(renderer->device, &fenceInfo, NULL,
+                          fence) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create semaphores.\n");
+        }
     }
+}
+
+void skRenderer_CleanSwapchain(skRenderer* renderer)
+{
+    // Destroy framebuffers
+    for (int i = 0; i < renderer->swapchainFramebuffers->size; i++)
+    {
+        VkFramebuffer framebuffer = *(VkFramebuffer*)skVector_Get(
+            renderer->swapchainFramebuffers, i);
+        vkDestroyFramebuffer(renderer->device, framebuffer, NULL);
+    }
+    skVector_Clear(renderer->swapchainFramebuffers); // Clear vector
+
+    // Destroy pipeline and render pass if they exist
+    if (renderer->pipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(renderer->device, renderer->pipeline, NULL);
+        renderer->pipeline = VK_NULL_HANDLE;
+    }
+
+    if (renderer->renderPass != VK_NULL_HANDLE)
+    {
+        vkDestroyRenderPass(renderer->device, renderer->renderPass,
+                            NULL);
+        renderer->renderPass = VK_NULL_HANDLE;
+    }
+
+    // Destroy image views
+    for (int i = 0; i < renderer->swapchainImageViews->size; i++)
+    {
+        VkImageView imageView = *(VkImageView*)skVector_Get(
+            renderer->swapchainImageViews, i);
+        vkDestroyImageView(renderer->device, imageView, NULL);
+    }
+    skVector_Clear(renderer->swapchainImageViews);
+
+    // Destroy swapchain
+    if (renderer->swapchain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(renderer->device, renderer->swapchain,
+                              NULL);
+        renderer->swapchain = VK_NULL_HANDLE;
+    }
+}
+
+void skRenderer_RecreateSwapchain(skRenderer* renderer,
+                                  skWindow*   window)
+{
+    vkDeviceWaitIdle(renderer->device);
+    skRenderer_CleanSwapchain(renderer);
+
+    // Recreate core swapchain resources
+    skRenderer_CreateSwapchain(renderer, window);
+    skRenderer_CreateImageViews(renderer);
+    skRenderer_CreateRenderPass(renderer);
+    skRenderer_CreateGraphicsPipeline(renderer);
+    skRenderer_CreateFrameBuffers(renderer);
+
+    // Recreate command buffers
+    if (renderer->commandBuffers &&
+        renderer->commandBuffers->size > 0)
+    {
+        vkFreeCommandBuffers(
+            renderer->device, renderer->commandPool,
+            renderer->commandBuffers->size,
+            (VkCommandBuffer*)renderer->commandBuffers->data);
+        renderer->commandBuffers->size = 0; // Reset vector
+    }
+    skRenderer_CreateCommandBuffers(renderer);
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer)
 {
-    vkWaitForFences(renderer->device, 1, &renderer->inFlightFence,
-                    VK_TRUE, UINT64_MAX);
-    vkResetFences(renderer->device, 1, &renderer->inFlightFence);
+    u32 currentFrame = renderer->currentFrame;
 
-    u32 imageIndex;
-    vkAcquireNextImageKHR(renderer->device, renderer->swapchain,
-                          UINT64_MAX,
-                          renderer->imageAvailableSemaphore,
-                          VK_NULL_HANDLE, &imageIndex);
+    VkFence* inFlightFence = (VkFence*)skVector_Get(
+        renderer->inFlightFences, currentFrame);
+    VkSemaphore* imageAvailableSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->imageAvailableSemaphores, currentFrame);
+    VkSemaphore* renderFinishedSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->renderFinishedSemaphores, currentFrame);
+    VkCommandBuffer* commandBuffer = (VkCommandBuffer*)skVector_Get(
+        renderer->commandBuffers, currentFrame);
+    VkCommandBuffer cmdBuffer = *commandBuffer;
 
-    vkResetCommandBuffer(renderer->commandBuffer, 0);
+    vkWaitForFences(renderer->device, 1, inFlightFence, VK_TRUE,
+                    UINT64_MAX);
 
-    skRenderer_RecordCommandBuffer(renderer, renderer->commandBuffer,
-                                   imageIndex);
+    u32      imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        renderer->device, renderer->swapchain, UINT64_MAX,
+        *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        result == VK_SUBOPTIMAL_KHR ||
+        renderer->window->framebufferResized)
+    {
+        skRenderer_RecreateSwapchain(renderer, renderer->window);
+        renderer->window->framebufferResized = false;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        printf("SK ERROR: Failed to acquire swapchain image.\n");
+    }
+
+    vkResetFences(renderer->device, 1, inFlightFence);
+
+    vkResetCommandBuffer(cmdBuffer, 0);
+
+    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex);
 
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = {
-        renderer->imageAvailableSemaphore};
+    VkSemaphore waitSemaphores[] = {*imageAvailableSemaphore};
     VkPipelineStageFlags waitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
@@ -878,15 +1042,14 @@ void skRenderer_DrawFrame(skRenderer* renderer)
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &renderer->commandBuffer;
+    submitInfo.pCommandBuffers = commandBuffer;
 
-    VkSemaphore signalSemaphores[] = {
-        renderer->renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = {*renderFinishedSemaphore};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
-                      renderer->inFlightFence) != VK_SUCCESS)
+                      *inFlightFence) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to submit draw command buffer.");
     }
@@ -903,19 +1066,32 @@ void skRenderer_DrawFrame(skRenderer* renderer)
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = NULL;
 
-    vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
+    result = vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        result == VK_SUBOPTIMAL_KHR ||
+        renderer->window->framebufferResized)
+    {
+        renderer->window->framebufferResized = false;
+        skRenderer_RecreateSwapchain(renderer, renderer->window);
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        printf("SK ERROR: Failed to acquire swapchain image.\n");
+    }
+
+    renderer->currentFrame = (currentFrame + 1) % SK_FRAMES_IN_FLIGHT;
 }
 
-skRenderer skRenderer_Create(skWindow* window)
+void skRenderer_CreateInstance(skRenderer* renderer)
 {
-    skRenderer renderer = {0};
-
     if (enableValidationLayers && !skCheckValidationLayerSupport())
     {
         printf("SK ERROR: Validation layers requested, but not "
-               "available!\n");
+               "available.\n");
     }
 
+    // Send information about our application to the Vulkan API
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Sulkan";
@@ -931,10 +1107,11 @@ skRenderer skRenderer_Create(skWindow* window)
     uint32_t     glfwExtensionCount = 0;
     const char** glfwExtensions;
 
+    // Get required vulkan extensions from GLFW
     glfwExtensions =
         glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    // Create extensions array with space for debug extension
+    // Create extensions array with space for other extensions
     uint32_t     extensionCount = glfwExtensionCount;
     const char** extensions = (const char**)malloc(
         (glfwExtensionCount + 1) * sizeof(const char*));
@@ -946,6 +1123,7 @@ skRenderer skRenderer_Create(skWindow* window)
 
     if (enableValidationLayers)
     {
+        // Enable the validation layer extension
         extensions[extensionCount++] =
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     }
@@ -969,48 +1147,38 @@ skRenderer skRenderer_Create(skWindow* window)
         createInfo.pNext = NULL;
     }
 
-    if (vkCreateInstance(&createInfo, NULL, &renderer.instance) !=
+    // Create the instance
+    if (vkCreateInstance(&createInfo, NULL, &renderer->instance) !=
         VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create Vulkan instance.\n");
     }
 
     free(extensions);
+}
 
-    // SURFACE CREATION
-    // ---
-
-    if (glfwCreateWindowSurface(renderer.instance, window->window,
+void skRenderer_CreateSurface(skRenderer* renderer, skWindow* window)
+{
+    if (glfwCreateWindowSurface(renderer->instance, window->window,
                                 NULL,
-                                &renderer.surface) != VK_SUCCESS)
+                                &renderer->surface) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create window surface.");
     }
+}
 
-    // Setup debug messenger
-    if (enableValidationLayers)
-    {
-        VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo =
-            {0};
-        skPopulateDebugMessengerCreateInfo(&debugMessengerCreateInfo);
-
-        if (skCreateDebugUtilsMessengerEXT(
-                renderer.instance, &debugMessengerCreateInfo, NULL,
-                &renderer.debugMessenger) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to set up debug messenger!\n");
-        }
-    }
-
+void skRenderer_CreatePhysicalDevice(skRenderer* renderer)
+{
     u32 deviceCount = 0;
 
     // First call: get the number of devices
-    vkEnumeratePhysicalDevices(renderer.instance, &deviceCount, NULL);
+    vkEnumeratePhysicalDevices(renderer->instance, &deviceCount,
+                               NULL);
 
     if (deviceCount == 0)
     {
         printf("SK ERROR: No physical device found.\n");
-        return renderer;
+        exit(1);
     }
 
     // Create vector with the correct size
@@ -1019,7 +1187,7 @@ skRenderer skRenderer_Create(skWindow* window)
 
     // Second call: get the actual devices
     vkEnumeratePhysicalDevices(
-        renderer.instance, &deviceCount,
+        renderer->instance, &deviceCount,
         (VkPhysicalDevice*)physicalDevices->data);
 
     // Update the vector's size to reflect the actual number of
@@ -1032,24 +1200,24 @@ skRenderer skRenderer_Create(skWindow* window)
             (VkPhysicalDevice*)skVector_Get(physicalDevices, i);
         VkPhysicalDevice device = *devicePtr;
 
-        if (skRenderer_IsDeviceSuitable(device, renderer.surface))
+        if (skRenderer_IsDeviceSuitable(device, renderer->surface))
         {
-            renderer.physicalDevice = device;
+            renderer->physicalDevice = device;
             break; // Found a suitable device, no need to continue
         }
     }
 
-    if (renderer.physicalDevice == VK_NULL_HANDLE)
+    if (renderer->physicalDevice == VK_NULL_HANDLE)
     {
         printf(
             "SK ERROR: Failed to find a suitable physical device.\n");
     }
+}
 
-    // LOGICAL DEVICE CREATION
-    // ---
-
+void skRenderer_CreateLogicalDevice(skRenderer* renderer)
+{
     skQueueFamilyIndices indices = skFindQueueFamilies(
-        renderer.physicalDevice, renderer.surface);
+        renderer->physicalDevice, renderer->surface);
 
     // Create queue create infos for unique queue families
     skVector* queueCreateInfos =
@@ -1108,28 +1276,131 @@ skRenderer skRenderer_Create(skWindow* window)
         deviceCreateInfo.enabledLayerCount = 0;
     }
 
-    if (vkCreateDevice(renderer.physicalDevice, &deviceCreateInfo,
-                       NULL, &renderer.device) != VK_SUCCESS)
+    if (vkCreateDevice(renderer->physicalDevice, &deviceCreateInfo,
+                       NULL, &renderer->device) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create logical device.");
     }
 
     // Get the queue handles
-    vkGetDeviceQueue(renderer.device, indices.graphicsFamily, 0,
-                     &renderer.graphicsQueue);
-    vkGetDeviceQueue(renderer.device, indices.presentFamily, 0,
-                     &renderer.presentQueue);
+    vkGetDeviceQueue(renderer->device, indices.graphicsFamily, 0,
+                     &renderer->graphicsQueue);
+    vkGetDeviceQueue(renderer->device, indices.presentFamily, 0,
+                     &renderer->presentQueue);
 
     // Clean up
     skVector_Free(queueCreateInfos);
+}
 
+void skRenderer_CreateDebugMessenger(skRenderer* renderer)
+{
+    // Setup debug messenger
+    if (enableValidationLayers)
+    {
+        VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo =
+            {0};
+        skPopulateDebugMessengerCreateInfo(&debugMessengerCreateInfo);
+
+        if (skCreateDebugUtilsMessengerEXT(
+                renderer->instance, &debugMessengerCreateInfo, NULL,
+                &renderer->debugMessenger) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to set up debug messenger!\n");
+        }
+    }
+}
+
+u32 skRenderer_FindMemoryType(skRenderer* renderer, u32 typeFilter,
+                              VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(renderer->physicalDevice,
+                                        &memProperties);
+
+    for (u32 i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags &
+             properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    printf("SK ERROR: Failed to find suitable memory type.\n");
+    return -1;
+}
+
+void skRenderer_CreateVertexBuffer(skRenderer* renderer)
+{
+    const skVertex vertices[] = {{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                 {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+                                 {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+
+    VkBufferCreateInfo bufferInfo = {0};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(vertices[0]) * 3;
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(renderer->device, &bufferInfo, NULL,
+                       &renderer->vertexBuffer) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create vertex buffer.");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(
+        renderer->device, renderer->vertexBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
+        renderer, memRequirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
+                         &renderer->vertexBufferMemory) != VK_SUCCESS)
+    {
+        printf(
+            "SK ERROR: Failed to allocate vertex buffer memory.\n");
+    }
+
+    vkBindBufferMemory(renderer->device, renderer->vertexBuffer,
+                       renderer->vertexBufferMemory, 0);
+
+    void* data;
+    vkMapMemory(renderer->device, renderer->vertexBufferMemory, 0,
+                bufferInfo.size, 0, &data);
+
+    memcpy(data, vertices, sizeof(vertices[0]) * 3);
+
+    vkUnmapMemory(renderer->device, renderer->vertexBufferMemory);
+}
+
+skRenderer skRenderer_Create(skWindow* window)
+{
+    skRenderer  renderer = {0};
+    skRenderer* rendererPtr = &renderer;
+
+    renderer.currentFrame = 0;
+    renderer.window = window;
+
+    skRenderer_CreateInstance(rendererPtr);
+    skRenderer_CreateSurface(rendererPtr, window);
+    skRenderer_CreateDebugMessenger(rendererPtr);
+    skRenderer_CreatePhysicalDevice(rendererPtr);
+    skRenderer_CreateLogicalDevice(rendererPtr);
     skRenderer_CreateSwapchain(&renderer, window);
     skRenderer_CreateImageViews(&renderer);
     skRenderer_CreateRenderPass(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateFrameBuffers(&renderer);
     skRenderer_CreateCommandPool(&renderer);
-    skRenderer_CreateCommandBuffer(&renderer);
+    skRenderer_CreateCommandBuffers(&renderer);
+    skRenderer_CreateVertexBuffer(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
 
     return renderer;
