@@ -40,6 +40,13 @@ typedef struct skVertex
     vec3 colour;
 } skVertex;
 
+typedef struct skUniformBufferObject
+{
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} skUniformBufferObject;
+
 typedef struct skRenderer
 {
     skWindow* window;
@@ -68,6 +75,17 @@ typedef struct skRenderer
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
+
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+
+    skVector* descriptorSets; // VkDescriptorSet
+    skVector* uniformBuffers; // VkBuffer
+    skVector* uniformBuffersMemory; // VkDeviceMemory
+    skVector* uniformBuffersMap; // void*
+
+    double startTime;
+
     VkInstance instance;
 } skRenderer;
 

@@ -994,6 +994,28 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
     skRenderer_CreateCommandBuffers(renderer);
 }
 
+void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
+{
+    double currentTime = glfwGetTime();
+    double time = currentTime - renderer->startTime;
+
+    void* map = *(void**)skVector_Get(renderer->uniformBuffersMap,
+                             renderer->currentFrame);
+
+    skUniformBufferObject ubo = {0};
+
+    glm_rotate(ubo.model, time * glm_rad(90.0f),
+               (vec3) {0.0f, 0.0f, 1.0f});
+    glm_lookat((vec3) {2.0f, 2.0f, 2.0f}, (vec3) {0.0f, 0.0f, 0.0f},
+               (vec3) {0.0f, 0.0f, 1.0f}, ubo.view);
+    glm_perspective(glm_rad(45.0f),
+                    renderer->swapchainExtent.width /
+                        (float)renderer->swapchainExtent.height,
+                    0.1f, 100.0f, ubo.proj);
+
+    // memcpy(map, &ubo, sizeof(ubo));
+}
+
 void skRenderer_DrawFrame(skRenderer* renderer)
 {
     u32 currentFrame = renderer->currentFrame;
@@ -1019,6 +1041,8 @@ void skRenderer_DrawFrame(skRenderer* renderer)
     vkResetFences(renderer->device, 1, inFlightFence);
 
     vkResetCommandBuffer(cmdBuffer, 0);
+
+    skRenderer_UpdateUniformBuffers(renderer);
 
     skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex);
 
@@ -1475,6 +1499,139 @@ void skRenderer_CreateIndexBuffer(skRenderer* renderer)
     vkFreeMemory(renderer->device, stagingMemory, NULL);
 }
 
+void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
+{
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {0};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    layoutInfo.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(
+            renderer->device, &layoutInfo, NULL,
+            &renderer->descriptorSetLayout) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create descriptor set layout.\n");
+    }
+}
+
+void skRenderer_CreateUniformBuffers(skRenderer* renderer)
+{
+    VkDeviceSize bufferSize = sizeof(skUniformBufferObject);
+
+    renderer->uniformBuffers = skVector_Create(sizeof(VkBuffer), 2);
+    renderer->uniformBuffersMemory =
+        skVector_Create(sizeof(VkDeviceMemory), 2);
+    renderer->uniformBuffersMap = skVector_Create(sizeof(void*), 2);
+    skVector_Resize(renderer->uniformBuffers, SK_FRAMES_IN_FLIGHT);
+    skVector_Resize(renderer->uniformBuffersMemory,
+                    SK_FRAMES_IN_FLIGHT);
+    skVector_Resize(renderer->uniformBuffersMap, SK_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        VkBuffer* buf =
+            (VkBuffer*)skVector_Get(renderer->uniformBuffers, i);
+        VkDeviceMemory* mem = (VkDeviceMemory*)skVector_Get(
+            renderer->uniformBuffersMemory, i);
+        void* map = skVector_Get(renderer->uniformBuffersMap, i);
+
+        skRenderer_CreateBuffer(
+            renderer, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            buf, mem);
+
+        vkMapMemory(renderer->device, *mem, 0, bufferSize, 0, &map);
+    }
+}
+
+void skRenderer_CreateDescriptorPool(skRenderer* renderer)
+{
+    VkDescriptorPoolSize poolSize = {0};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = SK_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo poolInfo = {0};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = SK_FRAMES_IN_FLIGHT;
+
+    if (vkCreateDescriptorPool(renderer->device, &poolInfo, NULL,
+                               &renderer->descriptorPool) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create descriptor pool.");
+    }
+}
+
+void skRenderer_CreateDescriptorSets(skRenderer* renderer)
+{
+    skVector* layouts = skVector_Create(sizeof(VkDescriptorSetLayout),
+                                        SK_FRAMES_IN_FLIGHT);
+    renderer->descriptorSets =
+        skVector_Create(sizeof(VkDescriptorSet), SK_FRAMES_IN_FLIGHT);
+
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        skVector_PushBack(layouts, &renderer->descriptorSetLayout);
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = renderer->descriptorPool;
+    allocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
+    allocInfo.pSetLayouts = (VkDescriptorSetLayout*)layouts->data;
+
+    skVector_Resize(renderer->descriptorSets, SK_FRAMES_IN_FLIGHT);
+
+    if (vkAllocateDescriptorSets(
+            renderer->device, &allocInfo,
+            (VkDescriptorSet*)renderer->descriptorSets->data) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate descriptor sets.");
+    }
+
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        VkBuffer* buf =
+            (VkBuffer*)skVector_Get(renderer->uniformBuffers, i);
+        VkDescriptorSet* set = (VkDescriptorSet*)skVector_Get(
+            renderer->descriptorSets, i);
+
+        VkDescriptorBufferInfo bufferInfo = {0};
+        bufferInfo.buffer = *buf;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(skUniformBufferObject);
+
+        VkWriteDescriptorSet descriptorWrite = {0};
+        descriptorWrite.sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = *set;
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType =
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+        descriptorWrite.pImageInfo = NULL;
+        descriptorWrite.pTexelBufferView = NULL;
+
+        vkUpdateDescriptorSets(renderer->device, 1, &descriptorWrite,
+                               0, NULL);
+    }
+}
+
 skRenderer skRenderer_Create(skWindow* window)
 {
     skRenderer  renderer = {0};
@@ -1491,12 +1648,16 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateSwapchain(&renderer, window);
     skRenderer_CreateImageViews(&renderer);
     skRenderer_CreateRenderPass(&renderer);
+    skRenderer_CreateDescriptorSetLayout(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateFrameBuffers(&renderer);
     skRenderer_CreateCommandPool(&renderer);
-    skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateVertexBuffer(&renderer);
     skRenderer_CreateIndexBuffer(&renderer);
+    skRenderer_CreateUniformBuffers(&renderer); 
+    skRenderer_CreateDescriptorPool(&renderer); 
+    skRenderer_CreateDescriptorSets(&renderer); 
+    skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
 
     return renderer;
