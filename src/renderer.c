@@ -515,8 +515,8 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -877,10 +877,9 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     VkDescriptorSet* dSet = (VkDescriptorSet*)skVector_Get(
         renderer->descriptorSets, renderer->currentFrame);
 
-    vkCmdBindDescriptorSets(commandBuffer,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            renderer->pipelineLayout, 0, 1,
-                            dSet, 0, NULL);
+    vkCmdBindDescriptorSets(
+        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        renderer->pipelineLayout, 0, 1, dSet, 0, NULL);
 
     vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 
@@ -1012,14 +1011,23 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 
     skUniformBufferObject ubo = {0};
 
+    glm_mat4_identity(ubo.model);
+
     glm_rotate(ubo.model, time * glm_rad(90.0f),
                (vec3) {0.0f, 0.0f, 1.0f});
     glm_lookat((vec3) {2.0f, 2.0f, 2.0f}, (vec3) {0.0f, 0.0f, 0.0f},
                (vec3) {0.0f, 0.0f, 1.0f}, ubo.view);
+
+    // Create projection matrix
+    mat4 proj;
     glm_perspective(glm_rad(45.0f),
                     renderer->swapchainExtent.width /
                         (float)renderer->swapchainExtent.height,
-                    0.1f, 100.0f, ubo.proj);
+                    0.1f, 100.0f, proj);
+
+    // Adjust for Vulkan's coordinate system
+    proj[1][1] *= -1.0f;           // Flip Y-axis
+    glm_mat4_copy(proj, ubo.proj); // Copy to ubo
 
     memcpy(map, &ubo, sizeof(ubo));
 }
