@@ -1000,7 +1000,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     double time = currentTime - renderer->startTime;
 
     void* map = *(void**)skVector_Get(renderer->uniformBuffersMap,
-                             renderer->currentFrame);
+                                      renderer->currentFrame);
 
     skUniformBufferObject ubo = {0};
 
@@ -1013,7 +1013,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
                         (float)renderer->swapchainExtent.height,
                     0.1f, 100.0f, ubo.proj);
 
-    // memcpy(map, &ubo, sizeof(ubo));
+    memcpy(map, &ubo, sizeof(ubo));
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer)
@@ -1542,7 +1542,9 @@ void skRenderer_CreateUniformBuffers(skRenderer* renderer)
             (VkBuffer*)skVector_Get(renderer->uniformBuffers, i);
         VkDeviceMemory* mem = (VkDeviceMemory*)skVector_Get(
             renderer->uniformBuffersMemory, i);
-        void* map = skVector_Get(renderer->uniformBuffersMap, i);
+        void** mapPtr =
+            (void**)skVector_Get(renderer->uniformBuffersMap,
+                                 i); // Get pointer to vector element
 
         skRenderer_CreateBuffer(
             renderer, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1550,7 +1552,8 @@ void skRenderer_CreateUniformBuffers(skRenderer* renderer)
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             buf, mem);
 
-        vkMapMemory(renderer->device, *mem, 0, bufferSize, 0, &map);
+        // Store mapped pointer directly in the vector
+        vkMapMemory(renderer->device, *mem, 0, bufferSize, 0, mapPtr);
     }
 }
 
@@ -1654,9 +1657,9 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateCommandPool(&renderer);
     skRenderer_CreateVertexBuffer(&renderer);
     skRenderer_CreateIndexBuffer(&renderer);
-    skRenderer_CreateUniformBuffers(&renderer); 
-    skRenderer_CreateDescriptorPool(&renderer); 
-    skRenderer_CreateDescriptorSets(&renderer); 
+    skRenderer_CreateUniformBuffers(&renderer);
+    skRenderer_CreateDescriptorPool(&renderer);
+    skRenderer_CreateDescriptorSets(&renderer);
     skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
 
