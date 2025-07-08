@@ -871,7 +871,10 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
                            offsets);
 
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdBindIndexBuffer(commandBuffer, renderer->indexBuffer, 0,
+                         VK_INDEX_TYPE_UINT16);
+
+    vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1012,18 +1015,6 @@ void skRenderer_DrawFrame(skRenderer* renderer)
     VkResult result = vkAcquireNextImageKHR(
         renderer->device, renderer->swapchain, UINT64_MAX,
         *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-        result == VK_SUBOPTIMAL_KHR ||
-        renderer->window->framebufferResized)
-    {
-        skRenderer_RecreateSwapchain(renderer, renderer->window);
-        renderer->window->framebufferResized = false;
-    }
-    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-    {
-        printf("SK ERROR: Failed to acquire swapchain image.\n");
-    }
 
     vkResetFences(renderer->device, 1, inFlightFence);
 
@@ -1411,11 +1402,12 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
 
 void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 {
-    const skVertex vertices[] = {{{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-                                 {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                 {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+    const skVertex vertices[] = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                 {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                                 {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                                 {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
 
-    size_t bufferSize = sizeof(vertices[0]) * 3;
+    size_t bufferSize = sizeof(vertices[0]) * 4;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1429,18 +1421,55 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, vertices, sizeof(vertices[0]) * 3);
+    memcpy(data, vertices, sizeof(vertices[0]) * 4);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
-    skRenderer_CreateBuffer(
-        renderer, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &renderer->vertexBuffer, &renderer->vertexBufferMemory);
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &renderer->vertexBuffer,
+                            &renderer->vertexBufferMemory);
 
     skRenderer_CopyBuffer(renderer, stagingBuffer,
                           renderer->vertexBuffer, bufferSize);
+
+    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
+    vkFreeMemory(renderer->device, stagingMemory, NULL);
+}
+
+void skRenderer_CreateIndexBuffer(skRenderer* renderer)
+{
+    const u16 indices[] = {0, 1, 2, 2, 3, 0};
+
+    size_t bufferSize = sizeof(indices[0]) * 6;
+
+    VkBuffer       stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &stagingBuffer, &stagingMemory);
+
+    void* data;
+    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
+                &data);
+
+    memcpy(data, indices, sizeof(indices[0]) * 6);
+
+    vkUnmapMemory(renderer->device, stagingMemory);
+
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &renderer->indexBuffer,
+                            &renderer->indexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, stagingBuffer,
+                          renderer->indexBuffer, bufferSize);
 
     vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
     vkFreeMemory(renderer->device, stagingMemory, NULL);
@@ -1467,6 +1496,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateCommandPool(&renderer);
     skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateVertexBuffer(&renderer);
+    skRenderer_CreateIndexBuffer(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
 
     return renderer;

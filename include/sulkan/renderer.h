@@ -66,6 +66,8 @@ typedef struct skRenderer
     u32 currentFrame;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
     VkInstance instance;
 } skRenderer;
 
