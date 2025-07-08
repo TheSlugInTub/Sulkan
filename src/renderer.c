@@ -562,8 +562,8 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = NULL;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &renderer->descriptorSetLayout;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = NULL;
 
@@ -873,6 +873,14 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
     vkCmdBindIndexBuffer(commandBuffer, renderer->indexBuffer, 0,
                          VK_INDEX_TYPE_UINT16);
+
+    VkDescriptorSet* dSet = (VkDescriptorSet*)skVector_Get(
+        renderer->descriptorSets, renderer->currentFrame);
+
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            renderer->pipelineLayout, 0, 1,
+                            dSet, 0, NULL);
 
     vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 
