@@ -39,6 +39,7 @@ typedef struct skVertex
 {
     vec2 pos;
     vec3 colour;
+    vec2 textureCoordinates;
 } skVertex;
 
 typedef struct skUniformBufferObject
@@ -84,6 +85,11 @@ typedef struct skRenderer
     skVector* uniformBuffers; // VkBuffer
     skVector* uniformBuffersMemory; // VkDeviceMemory
     skVector* uniformBuffersMap; // void*
+
+    VkImage textureImage;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+    VkDeviceMemory textureImageMemory;
 
     double startTime;
 

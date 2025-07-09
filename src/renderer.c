@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <synchapi.h>
+#include <stb/stb_image.h>
 
 #ifdef DEBUG
 static const Bool enableValidationLayers = true;
@@ -22,12 +23,12 @@ VkVertexInputBindingDescription skVertex_GetBindingDescription()
 
 typedef struct VkVertexInputAttributeDescriptions
 {
-    VkVertexInputAttributeDescription descriptions[2];
+    VkVertexInputAttributeDescription descriptions[3];
 } VkVertexInputAttributeDescriptions;
 
 VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
 {
-    VkVertexInputAttributeDescription descriptions[2] = {0};
+    VkVertexInputAttributeDescription descriptions[3] = {0};
 
     descriptions[0].binding = 0;
     descriptions[0].location = 0;
@@ -39,8 +40,14 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
     descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     descriptions[1].offset = offsetof(skVertex, colour);
 
+    descriptions[2].binding = 0;
+    descriptions[2].location = 2;
+    descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    descriptions[2].offset = offsetof(skVertex, textureCoordinates);
+
     VkVertexInputAttributeDescriptions pair = {descriptions[0],
-                                               descriptions[1]};
+                                               descriptions[1],
+                                               descriptions[2]};
 
     return pair;
 }
@@ -470,7 +477,7 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     vertexInputInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.vertexAttributeDescriptionCount = 3;
     vertexInputInfo.pVertexAttributeDescriptions =
         attributeDescriptions.descriptions;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
@@ -1399,8 +1406,8 @@ void skRenderer_CreateBuffer(skRenderer* renderer, size_t size,
     vkBindBufferMemory(renderer->device, *buffer, *bufferMemory, 0);
 }
 
-void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
-                           VkBuffer dstBuffer, VkDeviceSize size)
+VkCommandBuffer
+skRenderer_BeginSingleTimeCommands(skRenderer* renderer)
 {
     VkCommandBufferAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1418,13 +1425,12 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
 
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
-    VkBufferCopy copyRegion = {0};
-    copyRegion.srcOffset = 0; // Optional
-    copyRegion.dstOffset = 0; // Optional
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1,
-                    &copyRegion);
+    return commandBuffer;
+}
 
+void skRenderer_EndSingleTimeCommands(skRenderer*     renderer,
+                                      VkCommandBuffer commandBuffer)
+{
     vkEndCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo = {0};
@@ -1440,12 +1446,29 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
                          &commandBuffer);
 }
 
+void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
+                           VkBuffer dstBuffer, VkDeviceSize size)
+{
+    VkCommandBuffer commandBuffer =
+        skRenderer_BeginSingleTimeCommands(renderer);
+
+    VkBufferCopy copyRegion = {0};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1,
+                    &copyRegion);
+
+    skRenderer_EndSingleTimeCommands(renderer, commandBuffer);
+}
+
 void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 {
-    const skVertex vertices[] = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                 {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-                                 {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-                                 {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+    const skVertex vertices[] = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
 
     size_t bufferSize = sizeof(vertices[0]) * 4;
 
@@ -1525,11 +1548,22 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = NULL;
 
+    VkDescriptorSetLayoutBinding samplerLayoutBinding = {0};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = NULL;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
+                                               samplerLayoutBinding};
+
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(
             renderer->device, &layoutInfo, NULL,
@@ -1575,14 +1609,17 @@ void skRenderer_CreateUniformBuffers(skRenderer* renderer)
 
 void skRenderer_CreateDescriptorPool(skRenderer* renderer)
 {
-    VkDescriptorPoolSize poolSize = {0};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = SK_FRAMES_IN_FLIGHT;
+    VkDescriptorPoolSize poolSizes[] = {{0}, {0}};
+
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = SK_FRAMES_IN_FLIGHT;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = SK_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = SK_FRAMES_IN_FLIGHT;
 
     if (vkCreateDescriptorPool(renderer->device, &poolInfo, NULL,
@@ -1633,21 +1670,280 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(skUniformBufferObject);
 
-        VkWriteDescriptorSet descriptorWrite = {0};
-        descriptorWrite.sType =
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = *set;
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType =
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
-        descriptorWrite.pImageInfo = NULL;
-        descriptorWrite.pTexelBufferView = NULL;
+        VkDescriptorImageInfo imageInfo = {0};
+        imageInfo.imageLayout =
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = renderer->textureImageView;
+        imageInfo.sampler = renderer->textureSampler;
 
-        vkUpdateDescriptorSets(renderer->device, 1, &descriptorWrite,
+        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}};
+        descriptorWrites[0].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = *set;
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType =
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+        descriptorWrites[0].pImageInfo = NULL;
+        descriptorWrites[0].pTexelBufferView = NULL;
+
+        descriptorWrites[1].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = *set;
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType =
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(renderer->device, 2, descriptorWrites,
                                0, NULL);
+    }
+}
+
+void skRenderer_CreateImage(skRenderer* renderer, u32 width,
+                            u32 height, VkFormat format,
+                            VkImageTiling         tiling,
+                            VkImageUsageFlags     usage,
+                            VkMemoryPropertyFlags properties,
+                            VkImage*              image,
+                            VkDeviceMemory*       imageMemory)
+{
+    VkImageCreateInfo imageInfo = {0};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateImage(renderer->device, &imageInfo, NULL, image) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create image.");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(renderer->device, *image,
+                                 &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
+        renderer, memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
+                         imageMemory) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate image memory.");
+    }
+
+    vkBindImageMemory(renderer->device, *image, *imageMemory, 0);
+}
+
+void skRenderer_CopyBufferToImage(skRenderer* renderer,
+                                  VkBuffer buffer, VkImage image,
+                                  u32 width, u32 height)
+{
+    VkCommandBuffer commandBuffer =
+        skRenderer_BeginSingleTimeCommands(renderer);
+
+    VkBufferImageCopy region = {0};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageOffset = (VkOffset3D) {0, 0, 0};
+    region.imageExtent = (VkExtent3D) {width, height, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer, buffer, image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                           &region);
+
+    skRenderer_EndSingleTimeCommands(renderer, commandBuffer);
+}
+
+void skRenderer_TransitionImageLayout(skRenderer* renderer,
+                                      VkImage image, VkFormat format,
+                                      VkImageLayout oldLayout,
+                                      VkImageLayout newLayout)
+{
+    VkCommandBuffer commandBuffer =
+        skRenderer_BeginSingleTimeCommands(renderer);
+
+    VkImageMemoryBarrier barrier = {0};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else
+    {
+        printf("SK ERROR: Unsupported layout transition.\n");
+    }
+
+    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage,
+                         0, 0, NULL, 0, NULL, 1, &barrier);
+
+    skRenderer_EndSingleTimeCommands(renderer, commandBuffer);
+}
+
+void skRenderer_CreateTextureImage(skRenderer* renderer)
+{
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels =
+        stbi_load("res/textures/image.png", &texWidth, &texHeight,
+                  &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load texture image.");
+    }
+
+    VkBuffer       stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    skRenderer_CreateBuffer(renderer, imageSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &stagingBuffer, &stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(renderer->device, stagingBufferMemory, 0, imageSize,
+                0, &data);
+    memcpy(data, pixels, imageSize);
+    vkUnmapMemory(renderer->device, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->textureImage,
+        &renderer->textureImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(
+        renderer, stagingBuffer, renderer->textureImage,
+        (uint32_t)(texWidth), (uint32_t)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+VkImageView skRenderer_CreateImageView(skRenderer* renderer,
+                                       VkImage image, VkFormat format)
+{
+    VkImageViewCreateInfo viewInfo = {0};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(renderer->device, &viewInfo, NULL,
+                          &imageView) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create texture image view.");
+    }
+
+    return imageView;
+}
+
+void skRenderer_CreateTextureImageView(skRenderer* renderer)
+{
+    renderer->textureImageView = skRenderer_CreateImageView(
+        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+}
+
+void skRenderer_CreateTextureSampler(skRenderer* renderer)
+{
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &renderer->textureSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create texture sampler.");
     }
 }
 
@@ -1671,6 +1967,9 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateFrameBuffers(&renderer);
     skRenderer_CreateCommandPool(&renderer);
+    skRenderer_CreateTextureImage(&renderer);
+    skRenderer_CreateTextureImageView(&renderer);
+    skRenderer_CreateTextureSampler(&renderer);
     skRenderer_CreateVertexBuffer(&renderer);
     skRenderer_CreateIndexBuffer(&renderer);
     skRenderer_CreateUniformBuffers(&renderer);
