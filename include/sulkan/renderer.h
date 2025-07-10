@@ -37,7 +37,7 @@ typedef enum skShaderType
 
 typedef struct skVertex 
 {
-    vec2 pos;
+    vec3 pos;
     vec3 colour;
     vec2 textureCoordinates;
 } skVertex;
@@ -90,6 +90,10 @@ typedef struct skRenderer
     VkImageView textureImageView;
     VkSampler textureSampler;
     VkDeviceMemory textureImageMemory;
+    
+    VkImage depthImage;
+    VkImageView depthImageView;
+    VkDeviceMemory depthImageMemory;
 
     double startTime;
 

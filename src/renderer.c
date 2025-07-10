@@ -32,7 +32,7 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
 
     descriptions[0].binding = 0;
     descriptions[0].location = 0;
-    descriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     descriptions[0].offset = offsetof(skVertex, pos);
 
     descriptions[1].binding = 0;
@@ -45,9 +45,8 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
     descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
     descriptions[2].offset = offsetof(skVertex, textureCoordinates);
 
-    VkVertexInputAttributeDescriptions pair = {descriptions[0],
-                                               descriptions[1],
-                                               descriptions[2]};
+    VkVertexInputAttributeDescriptions pair = {
+        descriptions[0], descriptions[1], descriptions[2]};
 
     return pair;
 }
@@ -824,6 +823,8 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
     }
 }
 
+u16 numIndices = 12;
+
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
                                     u32             imageIndex)
@@ -888,7 +889,7 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         renderer->pipelineLayout, 0, 1, dSet, 0, NULL);
 
-    vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1464,13 +1465,20 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
 
 void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 {
-    const skVertex vertices[] = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
+    u16 numVertices = 8;
 
-    size_t bufferSize = sizeof(vertices[0]) * 4;
+    const skVertex vertices[] = {
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+
+    size_t bufferSize = sizeof(vertices[0]) * numVertices;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1484,7 +1492,7 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, vertices, sizeof(vertices[0]) * 4);
+    memcpy(data, vertices, sizeof(vertices[0]) * numVertices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1504,9 +1512,9 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 
 void skRenderer_CreateIndexBuffer(skRenderer* renderer)
 {
-    const u16 indices[] = {0, 1, 2, 2, 3, 0};
+    const uint16_t indices[] = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
-    size_t bufferSize = sizeof(indices[0]) * 6;
+    size_t bufferSize = sizeof(indices[0]) * numIndices;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1520,7 +1528,7 @@ void skRenderer_CreateIndexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, indices, sizeof(indices[0]) * 6);
+    memcpy(data, indices, sizeof(indices[0]) * numIndices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1884,14 +1892,14 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
 }
 
 VkImageView skRenderer_CreateImageView(skRenderer* renderer,
-                                       VkImage image, VkFormat format)
+                                       VkImage image, VkFormat format, VkImageAspectFlags flags)
 {
     VkImageViewCreateInfo viewInfo = {0};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.aspectMask = flags;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -1910,7 +1918,7 @@ VkImageView skRenderer_CreateImageView(skRenderer* renderer,
 void skRenderer_CreateTextureImageView(skRenderer* renderer)
 {
     renderer->textureImageView = skRenderer_CreateImageView(
-        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void skRenderer_CreateTextureSampler(skRenderer* renderer)
@@ -1947,6 +1955,21 @@ void skRenderer_CreateTextureSampler(skRenderer* renderer)
     }
 }
 
+// VK_FORMAT_D32_SFLOAT
+
+Bool skHasStencilComponent(VkFormat format)
+{
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+           format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+void skRenderer_CreateDepthResources(skRenderer* renderer)
+{
+    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+
+
+}
+
 skRenderer skRenderer_Create(skWindow* window)
 {
     skRenderer  renderer = {0};
@@ -1967,6 +1990,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateFrameBuffers(&renderer);
     skRenderer_CreateCommandPool(&renderer);
+    skRenderer_CreateDepthResources(&renderer);
     skRenderer_CreateTextureImage(&renderer);
     skRenderer_CreateTextureImageView(&renderer);
     skRenderer_CreateTextureSampler(&renderer);
