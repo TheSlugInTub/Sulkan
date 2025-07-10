@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <synchapi.h>
 #include <stb/stb_image.h>
+#include <tinyobjloader.h>
 
 #ifdef DEBUG
 static const Bool enableValidationLayers = true;
@@ -33,12 +34,12 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
     descriptions[0].binding = 0;
     descriptions[0].location = 0;
     descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[0].offset = offsetof(skVertex, pos);
+    descriptions[0].offset = offsetof(skVertex, position);
 
     descriptions[1].binding = 0;
     descriptions[1].location = 1;
     descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[1].offset = offsetof(skVertex, colour);
+    descriptions[1].offset = offsetof(skVertex, normal);
 
     descriptions[2].binding = 0;
     descriptions[2].location = 2;
@@ -100,7 +101,7 @@ VkShaderModule skCreateShaderModule(skRenderer* renderer,
 static const char* validationLayers[] = {
     "VK_LAYER_KHRONOS_validation"};
 
-static const uint32_t validationLayerCount =
+static const u32 validationLayerCount =
     sizeof(validationLayers) / sizeof(validationLayers[0]);
 
 // Debug callback function
@@ -153,18 +154,18 @@ void skDestroyDebugUtilsMessengerEXT(
 // Function to check if validation layers are available
 Bool skCheckValidationLayerSupport()
 {
-    uint32_t layerCount;
+    u32 layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, NULL);
 
     VkLayerProperties* availableLayers = (VkLayerProperties*)malloc(
         layerCount * sizeof(VkLayerProperties));
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
 
-    for (uint32_t i = 0; i < validationLayerCount; i++)
+    for (u32 i = 0; i < validationLayerCount; i++)
     {
         Bool layerFound = false;
 
-        for (uint32_t j = 0; j < layerCount; j++)
+        for (u32 j = 0; j < layerCount; j++)
         {
             if (strcmp(validationLayers[i],
                        availableLayers[j].layerName) == 0)
@@ -269,8 +270,8 @@ VkExtent2D skChooseSwapExtent(VkSurfaceCapabilitiesKHR* capabilities,
         int width, height;
         glfwGetFramebufferSize(window->window, &width, &height);
 
-        VkExtent2D actualExtent = {(uint32_t)(width),
-                                   (uint32_t)(height)};
+        VkExtent2D actualExtent = {(u32)(width),
+                                   (u32)(height)};
         actualExtent.width = skClampU32(
             actualExtent.width, capabilities->minImageExtent.width,
             capabilities->maxImageExtent.width);
@@ -294,7 +295,7 @@ skSwapchainDetails skQuerySwapchainSupport(skRenderer* renderer)
         renderer->physicalDevice, renderer->surface,
         &details.capabilities);
 
-    uint32_t formatCount;
+    u32 formatCount;
     vkGetPhysicalDeviceSurfaceFormatsKHR(renderer->physicalDevice,
                                          renderer->surface,
                                          &formatCount, NULL);
@@ -307,7 +308,7 @@ skSwapchainDetails skQuerySwapchainSupport(skRenderer* renderer)
             (VkSurfaceFormatKHR*)details.formats->data);
     }
 
-    uint32_t presentModeCount;
+    u32 presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(
         renderer->physicalDevice, renderer->surface,
         &presentModeCount, NULL);
@@ -331,7 +332,7 @@ skQueueFamilyIndices skFindQueueFamilies(VkPhysicalDevice device,
 
     indices.isValid = false;
 
-    uint32_t queueFamilyCount = 0;
+    u32 queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device,
                                              &queueFamilyCount, NULL);
 
@@ -375,7 +376,7 @@ void skRenderer_CreateSwapchain(skRenderer* renderer,
     VkExtent2D extent =
         skChooseSwapExtent(&details.capabilities, window);
 
-    uint32_t imageCount = details.capabilities.minImageCount + 1;
+    u32 imageCount = details.capabilities.minImageCount + 1;
     if (details.capabilities.maxImageCount > 0 &&
         imageCount > details.capabilities.maxImageCount)
     {
@@ -395,7 +396,7 @@ void skRenderer_CreateSwapchain(skRenderer* renderer,
 
     skQueueFamilyIndices indices = skFindQueueFamilies(
         renderer->physicalDevice, renderer->surface);
-    uint32_t queueFamilyIndices[] = {indices.graphicsFamily,
+    u32 queueFamilyIndices[] = {indices.graphicsFamily,
                                      indices.presentFamily};
 
     if (indices.graphicsFamily != indices.presentFamily)
@@ -627,7 +628,7 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
 
 Bool skRenderer_CheckExtensionsSupported(VkPhysicalDevice device)
 {
-    uint32_t extensionCount;
+    u32 extensionCount;
     vkEnumerateDeviceExtensionProperties(device, NULL,
                                          &extensionCount, NULL);
 
@@ -639,12 +640,12 @@ Bool skRenderer_CheckExtensionsSupported(VkPhysicalDevice device)
 
     const char* requiredExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-    uint32_t requiredExtensionCount = 1;
+    u32 requiredExtensionCount = 1;
 
-    for (uint32_t i = 0; i < requiredExtensionCount; i++)
+    for (u32 i = 0; i < requiredExtensionCount; i++)
     {
         Bool found = false;
-        for (uint32_t j = 0; j < extensionCount; j++)
+        for (u32 j = 0; j < extensionCount; j++)
         {
             if (strcmp(requiredExtensions[i],
                        availableExtensions[j].extensionName) == 0)
@@ -925,7 +926,7 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                            offsets);
 
     vkCmdBindIndexBuffer(commandBuffer, renderer->indexBuffer, 0,
-                         VK_INDEX_TYPE_UINT16);
+                         VK_INDEX_TYPE_UINT32);
 
     VkDescriptorSet* dSet = (VkDescriptorSet*)skVector_Get(
         renderer->descriptorSets, renderer->currentFrame);
@@ -1028,6 +1029,116 @@ void skRenderer_CleanSwapchain(skRenderer* renderer)
     }
 }
 
+u32 skRenderer_FindMemoryType(skRenderer* renderer, u32 typeFilter,
+                              VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(renderer->physicalDevice,
+                                        &memProperties);
+
+    for (u32 i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags &
+             properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    printf("SK ERROR: Failed to find suitable memory type.\n");
+    return -1;
+}
+
+void skRenderer_CreateImage(skRenderer* renderer, u32 width,
+                            u32 height, VkFormat format,
+                            VkImageTiling         tiling,
+                            VkImageUsageFlags     usage,
+                            VkMemoryPropertyFlags properties,
+                            VkImage*              image,
+                            VkDeviceMemory*       imageMemory)
+{
+    VkImageCreateInfo imageInfo = {0};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateImage(renderer->device, &imageInfo, NULL, image) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create image.");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(renderer->device, *image,
+                                 &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
+        renderer, memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
+                         imageMemory) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate image memory.");
+    }
+
+    vkBindImageMemory(renderer->device, *image, *imageMemory, 0);
+}
+
+VkImageView skRenderer_CreateImageView(skRenderer* renderer,
+                                       VkImage image, VkFormat format,
+                                       VkImageAspectFlags flags)
+{
+    VkImageViewCreateInfo viewInfo = {0};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = flags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(renderer->device, &viewInfo, NULL,
+                          &imageView) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create texture image view.");
+    }
+
+    return imageView;
+}
+
+void skRenderer_CreateDepthResources(skRenderer* renderer)
+{
+    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+
+    skRenderer_CreateImage(
+        renderer, renderer->swapchainExtent.width,
+        renderer->swapchainExtent.height, depthFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->depthImage,
+        &renderer->depthImageMemory);
+    renderer->depthImageView = skRenderer_CreateImageView(
+        renderer, renderer->depthImage, depthFormat,
+        VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
 void skRenderer_RecreateSwapchain(skRenderer* renderer,
                                   skWindow*   window)
 {
@@ -1039,6 +1150,7 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
     skRenderer_CreateImageViews(renderer);
     skRenderer_CreateRenderPass(renderer);
     skRenderer_CreateGraphicsPipeline(renderer);
+    skRenderer_CreateDepthResources(renderer);
     skRenderer_CreateFramebuffers(renderer);
 
     // Recreate command buffers
@@ -1188,7 +1300,7 @@ void skRenderer_CreateInstance(skRenderer* renderer)
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    uint32_t     glfwExtensionCount = 0;
+    u32     glfwExtensionCount = 0;
     const char** glfwExtensions;
 
     // Get required vulkan extensions from GLFW
@@ -1196,11 +1308,11 @@ void skRenderer_CreateInstance(skRenderer* renderer)
         glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
     // Create extensions array with space for other extensions
-    uint32_t     extensionCount = glfwExtensionCount;
+    u32     extensionCount = glfwExtensionCount;
     const char** extensions = (const char**)malloc(
         (glfwExtensionCount + 1) * sizeof(const char*));
 
-    for (uint32_t i = 0; i < glfwExtensionCount; i++)
+    for (u32 i = 0; i < glfwExtensionCount; i++)
     {
         extensions[i] = glfwExtensions[i];
     }
@@ -1307,7 +1419,7 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
     skVector* queueCreateInfos =
         skVector_Create(sizeof(VkDeviceQueueCreateInfo), 2);
 
-    uint32_t uniqueQueueFamilies[2];
+    u32 uniqueQueueFamilies[2];
     int      uniqueCount = 0;
 
     // Add graphics family
@@ -1343,7 +1455,7 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
     deviceCreateInfo.pQueueCreateInfos =
         (VkDeviceQueueCreateInfo*)queueCreateInfos->data;
     deviceCreateInfo.queueCreateInfoCount =
-        (uint32_t)queueCreateInfos->size;
+        (u32)queueCreateInfos->size;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
     // Enable swapchain extension
@@ -1392,27 +1504,6 @@ void skRenderer_CreateDebugMessenger(skRenderer* renderer)
             printf("SK ERROR: Failed to set up debug messenger!\n");
         }
     }
-}
-
-u32 skRenderer_FindMemoryType(skRenderer* renderer, u32 typeFilter,
-                              VkMemoryPropertyFlags properties)
-{
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(renderer->physicalDevice,
-                                        &memProperties);
-
-    for (u32 i = 0; i < memProperties.memoryTypeCount; i++)
-    {
-        if ((typeFilter & (1 << i)) &&
-            (memProperties.memoryTypes[i].propertyFlags &
-             properties) == properties)
-        {
-            return i;
-        }
-    }
-
-    printf("SK ERROR: Failed to find suitable memory type.\n");
-    return -1;
 }
 
 void skRenderer_CreateBuffer(skRenderer* renderer, size_t size,
@@ -1510,20 +1601,21 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
 
 void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 {
-    u16 numVertices = 8;
+    // const skVertex vertices[] = {
+    //     {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    //     {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    //     {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    //     {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
 
-    const skVertex vertices[] = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    //     {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    //     {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    //     {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    //     {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
 
-        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-        {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+    skMesh* mesh = skVector_Get(renderer->model.meshes, 0);
+    u16 numVertices = mesh->vertices->size;
 
-    size_t bufferSize = sizeof(vertices[0]) * numVertices;
+    size_t bufferSize = sizeof(mesh->vertices[0]) * numVertices;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1537,7 +1629,7 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, vertices, sizeof(vertices[0]) * numVertices);
+    memcpy(data, mesh->vertices->data, sizeof(mesh->vertices[0]) * numVertices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1557,9 +1649,10 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
 
 void skRenderer_CreateIndexBuffer(skRenderer* renderer)
 {
-    const uint16_t indices[] = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
+    skMesh* mesh = skVector_Get(renderer->model.meshes, 0);
+    numIndices = mesh->indices->size;
 
-    size_t bufferSize = sizeof(indices[0]) * numIndices;
+    size_t bufferSize = sizeof(mesh->indices[0]) * numIndices;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1573,7 +1666,7 @@ void skRenderer_CreateIndexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, indices, sizeof(indices[0]) * numIndices);
+    memcpy(data, mesh->indices, sizeof(mesh->indices[0]) * numIndices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1757,54 +1850,6 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
     }
 }
 
-void skRenderer_CreateImage(skRenderer* renderer, u32 width,
-                            u32 height, VkFormat format,
-                            VkImageTiling         tiling,
-                            VkImageUsageFlags     usage,
-                            VkMemoryPropertyFlags properties,
-                            VkImage*              image,
-                            VkDeviceMemory*       imageMemory)
-{
-    VkImageCreateInfo imageInfo = {0};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = format;
-    imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateImage(renderer->device, &imageInfo, NULL, image) !=
-        VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create image.");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(renderer->device, *image,
-                                 &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
-        renderer, memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
-                         imageMemory) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to allocate image memory.");
-    }
-
-    vkBindImageMemory(renderer->device, *image, *imageMemory, 0);
-}
-
 void skRenderer_CopyBufferToImage(skRenderer* renderer,
                                   VkBuffer buffer, VkImage image,
                                   u32 width, u32 height)
@@ -1928,37 +1973,12 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     skRenderer_CopyBufferToImage(
         renderer, stagingBuffer, renderer->textureImage,
-        (uint32_t)(texWidth), (uint32_t)(texHeight));
+        (u32)(texWidth), (u32)(texHeight));
 
     skRenderer_TransitionImageLayout(
         renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-}
-
-VkImageView skRenderer_CreateImageView(skRenderer* renderer,
-                                       VkImage image, VkFormat format,
-                                       VkImageAspectFlags flags)
-{
-    VkImageViewCreateInfo viewInfo = {0};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = flags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    if (vkCreateImageView(renderer->device, &viewInfo, NULL,
-                          &imageView) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create texture image view.");
-    }
-
-    return imageView;
 }
 
 void skRenderer_CreateTextureImageView(skRenderer* renderer)
@@ -2008,20 +2028,10 @@ Bool skHasStencilComponent(VkFormat format)
            format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-void skRenderer_CreateDepthResources(skRenderer* renderer)
+void skRenderer_LoadModel(skRenderer* renderer)
 {
-    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
-
-    skRenderer_CreateImage(
-        renderer, renderer->swapchainExtent.width,
-        renderer->swapchainExtent.height, depthFormat,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->depthImage,
-        &renderer->depthImageMemory);
-    renderer->depthImageView = skRenderer_CreateImageView(
-        renderer, renderer->depthImage, depthFormat,
-        VK_IMAGE_ASPECT_DEPTH_BIT);
+    renderer->model = skModel_Create();
+    skModel_Load(&renderer->model, "res/room.obj");
 }
 
 skRenderer skRenderer_Create(skWindow* window)
@@ -2048,6 +2058,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateTextureImage(&renderer);
     skRenderer_CreateTextureImageView(&renderer);
     skRenderer_CreateTextureSampler(&renderer);
+    skRenderer_LoadModel(&renderer);
     skRenderer_CreateVertexBuffer(&renderer);
     skRenderer_CreateIndexBuffer(&renderer);
     skRenderer_CreateUniformBuffers(&renderer);

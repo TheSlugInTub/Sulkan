@@ -11,6 +11,7 @@
 #include <sulkan/vector.h>
 #include <sulkan/window.h>
 #include <cglm/cglm.h>
+#include <sulkan/model.h>
 
 #define SK_FRAMES_IN_FLIGHT (2)
 
@@ -34,13 +35,6 @@ typedef enum skShaderType
     skShaderType_Fragment,
     skShaderType_Geometry
 } skShaderType;
-
-typedef struct skVertex 
-{
-    vec3 pos;
-    vec3 colour;
-    vec2 textureCoordinates;
-} skVertex;
 
 typedef struct skUniformBufferObject
 {
@@ -94,6 +88,8 @@ typedef struct skRenderer
     VkImage depthImage;
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
+
+    skModel model;
 
     double startTime;
 
