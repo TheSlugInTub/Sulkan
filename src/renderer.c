@@ -591,7 +591,6 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = NULL;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
 
@@ -602,6 +601,21 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
 
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
+    depthStencil.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.front = (VkStencilOpState) {0};
+    depthStencil.back = (VkStencilOpState) {0};
+
+    pipelineInfo.pDepthStencilState = &depthStencil;
 
     if (vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1,
                                   &pipelineInfo, NULL,
@@ -720,27 +734,51 @@ void skRenderer_CreateRenderPass(skRenderer* renderer)
     colorAttachmentRef.layout =
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depthAttachment = {0};
+    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout =
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = {0};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout =
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass = {0};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+    VkAttachmentDescription attachments[2] = {colorAttachment,
+                                              depthAttachment};
 
     VkRenderPassCreateInfo renderPassInfo = {0};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = 2;
+    renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
 
     VkSubpassDependency dependency = {0};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.srcAccessMask = 0;
+    dependency.srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
@@ -752,7 +790,7 @@ void skRenderer_CreateRenderPass(skRenderer* renderer)
     }
 }
 
-void skRenderer_CreateFrameBuffers(skRenderer* renderer)
+void skRenderer_CreateFramebuffers(skRenderer* renderer)
 {
     renderer->swapchainFramebuffers =
         skVector_Create(sizeof(VkFramebuffer), 1);
@@ -761,15 +799,16 @@ void skRenderer_CreateFrameBuffers(skRenderer* renderer)
     {
         VkFramebuffer framebuf = {0};
 
-        VkImageView attachments[1] = {0};
+        VkImageView attachments[2] = {0};
         attachments[0] = *(VkImageView*)skVector_Get(
             renderer->swapchainImageViews, i);
+        attachments[1] = renderer->depthImageView;
 
         VkFramebufferCreateInfo framebufferInfo = {0};
         framebufferInfo.sType =
             VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderer->renderPass;
-        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.attachmentCount = 2;
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = renderer->swapchainExtent.width;
         framebufferInfo.height = renderer->swapchainExtent.height;
@@ -850,9 +889,15 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     renderPassInfo.renderArea.offset = (VkOffset2D) {0, 0};
     renderPassInfo.renderArea.extent = renderer->swapchainExtent;
 
-    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    VkClearValue clearColors[2] = {0};
+
+    clearColors[0].color =
+        (VkClearColorValue) {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearColors[1].depthStencil =
+        (VkClearDepthStencilValue) {1.0f, 0.0f};
+
+    renderPassInfo.clearValueCount = 2;
+    renderPassInfo.pClearValues = clearColors;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
@@ -994,7 +1039,7 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
     skRenderer_CreateImageViews(renderer);
     skRenderer_CreateRenderPass(renderer);
     skRenderer_CreateGraphicsPipeline(renderer);
-    skRenderer_CreateFrameBuffers(renderer);
+    skRenderer_CreateFramebuffers(renderer);
 
     // Recreate command buffers
     if (renderer->commandBuffers &&
@@ -1892,7 +1937,8 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
 }
 
 VkImageView skRenderer_CreateImageView(skRenderer* renderer,
-                                       VkImage image, VkFormat format, VkImageAspectFlags flags)
+                                       VkImage image, VkFormat format,
+                                       VkImageAspectFlags flags)
 {
     VkImageViewCreateInfo viewInfo = {0};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1918,7 +1964,8 @@ VkImageView skRenderer_CreateImageView(skRenderer* renderer,
 void skRenderer_CreateTextureImageView(skRenderer* renderer)
 {
     renderer->textureImageView = skRenderer_CreateImageView(
-        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void skRenderer_CreateTextureSampler(skRenderer* renderer)
@@ -1955,8 +2002,6 @@ void skRenderer_CreateTextureSampler(skRenderer* renderer)
     }
 }
 
-// VK_FORMAT_D32_SFLOAT
-
 Bool skHasStencilComponent(VkFormat format)
 {
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
@@ -1967,7 +2012,16 @@ void skRenderer_CreateDepthResources(skRenderer* renderer)
 {
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
-
+    skRenderer_CreateImage(
+        renderer, renderer->swapchainExtent.width,
+        renderer->swapchainExtent.height, depthFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->depthImage,
+        &renderer->depthImageMemory);
+    renderer->depthImageView = skRenderer_CreateImageView(
+        renderer, renderer->depthImage, depthFormat,
+        VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 skRenderer skRenderer_Create(skWindow* window)
@@ -1988,9 +2042,9 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateRenderPass(&renderer);
     skRenderer_CreateDescriptorSetLayout(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
-    skRenderer_CreateFrameBuffers(&renderer);
     skRenderer_CreateCommandPool(&renderer);
     skRenderer_CreateDepthResources(&renderer);
+    skRenderer_CreateFramebuffers(&renderer);
     skRenderer_CreateTextureImage(&renderer);
     skRenderer_CreateTextureImageView(&renderer);
     skRenderer_CreateTextureSampler(&renderer);
