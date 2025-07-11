@@ -2032,7 +2032,7 @@ Bool skHasStencilComponent(VkFormat format)
 void skRenderer_LoadModel(skRenderer* renderer)
 {
     renderer->model = skModel_Create();
-    skModel_Load(&renderer->model, "res/box.fbx");
+    skModel_Load(&renderer->model, "res/room.fbx");
 }
 
 skRenderer skRenderer_Create(skWindow* window)
