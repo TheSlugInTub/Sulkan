@@ -73,6 +73,11 @@ float skWindow_GetAspectRatio(skWindow* window)
     return (float)window->width / (float)window->height;
 }
 
+void skWindow_Rename(skWindow* window, const char* newName)
+{
+    glfwSetWindowTitle(window->window, newName);
+}
+
 void skWindow_Close(skWindow* window)
 {
     glfwTerminate();

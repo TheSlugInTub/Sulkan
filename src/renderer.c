@@ -233,7 +233,7 @@ skChooseSwapPresentMode(skVector* availablePresentModes)
             (VkPresentModeKHR*)skVector_Get(availablePresentModes, i);
         VkPresentModeKHR availableMode = *formatPtr;
 
-        if (availableMode == VK_PRESENT_MODE_MAILBOX_KHR)
+        if (availableMode == VK_PRESENT_MODE_IMMEDIATE_KHR)
         {
             return availableMode;
         }
