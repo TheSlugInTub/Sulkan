@@ -24,20 +24,20 @@ void skMesh_Destroy(skMesh* mesh)
 void skAssimpMat4ToGLM(const struct aiMatrix4x4* from, mat4 to)
 {
     to[0][0] = from->a1;
-    to[0][1] = from->b1;
-    to[0][2] = from->c1;
-    to[0][3] = from->d1;
     to[1][0] = from->a2;
-    to[1][1] = from->b2;
-    to[1][2] = from->c2;
-    to[1][3] = from->d2;
     to[2][0] = from->a3;
-    to[2][1] = from->b3;
-    to[2][2] = from->c3;
-    to[2][3] = from->d3;
     to[3][0] = from->a4;
+    to[0][1] = from->b1;
+    to[1][1] = from->b2;
+    to[2][1] = from->b3;
     to[3][1] = from->b4;
+    to[0][2] = from->c1;
+    to[1][2] = from->c2;
+    to[2][2] = from->c3;
     to[3][2] = from->c4;
+    to[0][3] = from->d1;
+    to[1][3] = from->d2;
+    to[2][3] = from->d3;
     to[3][3] = from->d4;
 }
 
@@ -79,7 +79,8 @@ void skModel_Load(skModel* model, const char* path)
     // Read file via ASSIMP
     const struct aiScene* scene = aiImportFile(
         path, aiProcess_Triangulate | aiProcess_GenSmoothNormals |
-                  aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+                  aiProcess_FlipUVs | aiProcess_CalcTangentSpace |
+                  aiProcess_GenUVCoords);
 
     // Check for errors
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
@@ -124,7 +125,7 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
 
     // Initialize vectors
     vertices = skVector_Create(sizeof(skVertex), 10);
-    indices = skVector_Create(sizeof(unsigned int), 10);
+    indices = skVector_Create(sizeof(uint32_t), 10);
     textures = skVector_Create(sizeof(skTexture), 2);
 
     // Process vertices
@@ -140,11 +141,13 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
             skAssimpVec3ToGLM(&mesh->mNormals[i], vertex.normal);
         }
 
-        // Texture coordinates
-        if (mesh->mTextureCoords[0])
+        if (mesh->mTextureCoords[0]) // Check if texture coordinates
+                                     // exist
         {
-            vertex.textureCoordinates[0] = mesh->mTextureCoords[0][i].x;
-            vertex.textureCoordinates[1] = mesh->mTextureCoords[0][i].y;
+            vertex.textureCoordinates[0] =
+                mesh->mTextureCoords[0][i].x;
+            vertex.textureCoordinates[1] =
+                1.0f - mesh->mTextureCoords[0][i].y;
         }
         else
         {

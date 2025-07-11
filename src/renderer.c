@@ -270,8 +270,7 @@ VkExtent2D skChooseSwapExtent(VkSurfaceCapabilitiesKHR* capabilities,
         int width, height;
         glfwGetFramebufferSize(window->window, &width, &height);
 
-        VkExtent2D actualExtent = {(u32)(width),
-                                   (u32)(height)};
+        VkExtent2D actualExtent = {(u32)(width), (u32)(height)};
         actualExtent.width = skClampU32(
             actualExtent.width, capabilities->minImageExtent.width,
             capabilities->maxImageExtent.width);
@@ -397,7 +396,7 @@ void skRenderer_CreateSwapchain(skRenderer* renderer,
     skQueueFamilyIndices indices = skFindQueueFamilies(
         renderer->physicalDevice, renderer->surface);
     u32 queueFamilyIndices[] = {indices.graphicsFamily,
-                                     indices.presentFamily};
+                                indices.presentFamily};
 
     if (indices.graphicsFamily != indices.presentFamily)
     {
@@ -863,7 +862,7 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
     }
 }
 
-u16 numIndices = 12;
+u16 numIndices = 11484;
 
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
@@ -1300,7 +1299,7 @@ void skRenderer_CreateInstance(skRenderer* renderer)
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    u32     glfwExtensionCount = 0;
+    u32          glfwExtensionCount = 0;
     const char** glfwExtensions;
 
     // Get required vulkan extensions from GLFW
@@ -1308,7 +1307,7 @@ void skRenderer_CreateInstance(skRenderer* renderer)
         glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
     // Create extensions array with space for other extensions
-    u32     extensionCount = glfwExtensionCount;
+    u32          extensionCount = glfwExtensionCount;
     const char** extensions = (const char**)malloc(
         (glfwExtensionCount + 1) * sizeof(const char*));
 
@@ -1420,7 +1419,7 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
         skVector_Create(sizeof(VkDeviceQueueCreateInfo), 2);
 
     u32 uniqueQueueFamilies[2];
-    int      uniqueCount = 0;
+    int uniqueCount = 0;
 
     // Add graphics family
     uniqueQueueFamilies[uniqueCount++] = indices.graphicsFamily;
@@ -1613,9 +1612,9 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
     //     {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
 
     skMesh* mesh = skVector_Get(renderer->model.meshes, 0);
-    u16 numVertices = mesh->vertices->size;
+    u16     numVertices = mesh->vertices->size;
 
-    size_t bufferSize = sizeof(mesh->vertices[0]) * numVertices;
+    size_t bufferSize = sizeof(skVertex) * numVertices;
 
     VkBuffer       stagingBuffer;
     VkDeviceMemory stagingMemory;
@@ -1629,7 +1628,8 @@ void skRenderer_CreateVertexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, mesh->vertices->data, sizeof(mesh->vertices[0]) * numVertices);
+    memcpy(data, mesh->vertices->data,
+           sizeof(skVertex) * numVertices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1666,7 +1666,8 @@ void skRenderer_CreateIndexBuffer(skRenderer* renderer)
     vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
                 &data);
 
-    memcpy(data, mesh->indices, sizeof(mesh->indices[0]) * numIndices);
+    memcpy(data, mesh->indices->data,
+           sizeof(u32) * numIndices);
 
     vkUnmapMemory(renderer->device, stagingMemory);
 
@@ -1934,7 +1935,7 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
 {
     int      texWidth, texHeight, texChannels;
     stbi_uc* pixels =
-        stbi_load("res/textures/image.png", &texWidth, &texHeight,
+        stbi_load("res/room.png", &texWidth, &texHeight,
                   &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
@@ -1971,9 +1972,9 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
         renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(
-        renderer, stagingBuffer, renderer->textureImage,
-        (u32)(texWidth), (u32)(texHeight));
+    skRenderer_CopyBufferToImage(renderer, stagingBuffer,
+                                 renderer->textureImage,
+                                 (u32)(texWidth), (u32)(texHeight));
 
     skRenderer_TransitionImageLayout(
         renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
@@ -2031,7 +2032,7 @@ Bool skHasStencilComponent(VkFormat format)
 void skRenderer_LoadModel(skRenderer* renderer)
 {
     renderer->model = skModel_Create();
-    skModel_Load(&renderer->model, "res/room.obj");
+    skModel_Load(&renderer->model, "res/box.fbx");
 }
 
 skRenderer skRenderer_Create(skWindow* window)
