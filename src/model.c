@@ -80,7 +80,8 @@ void skModel_Load(skModel* model, const char* path)
     const struct aiScene* scene = aiImportFile(
         path, aiProcess_Triangulate | aiProcess_GenSmoothNormals |
                   aiProcess_FlipUVs | aiProcess_CalcTangentSpace |
-                  aiProcess_GenUVCoords);
+                  aiProcess_GenUVCoords |
+                  aiProcess_JoinIdenticalVertices);
 
     // Check for errors
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
@@ -147,7 +148,7 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
             vertex.textureCoordinates[0] =
                 mesh->mTextureCoords[0][i].x;
             vertex.textureCoordinates[1] =
-                1.0f - mesh->mTextureCoords[0][i].y;
+                mesh->mTextureCoords[0][i].y;
         }
         else
         {

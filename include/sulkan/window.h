@@ -26,5 +26,7 @@ void skWindow_Update(skWindow* window);
 // (float)width / (float)height
 float skWindow_GetAspectRatio(skWindow* window);
 
+void skWindow_Rename(skWindow* window, const char* newName);
+
 // Closes the window
 void skWindow_Close(skWindow* window);

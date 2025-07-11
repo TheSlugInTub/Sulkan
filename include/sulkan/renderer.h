@@ -9,6 +9,7 @@
 
 #include <sulkan/essentials.h>
 #include <sulkan/vector.h>
+#include <sulkan/hashmap.h>
 #include <sulkan/window.h>
 #include <cglm/cglm.h>
 #include <sulkan/model.h>
