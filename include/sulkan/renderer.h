@@ -13,8 +13,10 @@
 #include <sulkan/window.h>
 #include <cglm/cglm.h>
 #include <sulkan/model.h>
+#include <sulkan/ecs_api.h>
 
 #define SK_FRAMES_IN_FLIGHT (2)
+#define SK_MAX_RENDER_OBJECTS (5)
 
 typedef struct skSwapchainDetails
 {
@@ -68,10 +70,6 @@ typedef struct skRenderer
     skVector* renderFinishedSemaphores; // VkSemaphore
     skVector* inFlightFences; // VkFence
     u32 currentFrame;
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
 
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
@@ -80,17 +78,12 @@ typedef struct skRenderer
     skVector* uniformBuffers; // VkBuffer
     skVector* uniformBuffersMemory; // VkDeviceMemory
     skVector* uniformBuffersMap; // void*
-
-    VkImage textureImage;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
-    VkDeviceMemory textureImageMemory;
-    
+  
     VkImage depthImage;
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
 
-    skModel model;
+    skVector* renderObjects; // skRenderObject
 
     double startTime;
 
@@ -98,5 +91,36 @@ typedef struct skRenderer
 } skRenderer;
 
 skRenderer skRenderer_Create(skWindow* window);
+void skRenderer_InitializeVulkan(skRenderer* renderer, skWindow* window);
+void skRenderer_InitializeUniformsAndDescriptors(skRenderer* renderer);
 void skRenderer_DrawFrame(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
+
+typedef struct skRenderObject
+{
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+    u32 indexCount;
+
+    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer uniformBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void* uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
+
+    mat4 transform;
+} skRenderObject;
+
+skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
+                                              skModel*    model,
+                                              const char* texturePath);
+void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
+                                              skRenderObject* obj);
+void skRenderer_AddRenderObject(skRenderer*     renderer,
+                                skRenderObject* object);

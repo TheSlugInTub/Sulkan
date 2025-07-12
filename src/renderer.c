@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <synchapi.h>
 #include <stb/stb_image.h>
-#include <tinyobjloader.h>
 
 #ifdef DEBUG
 static const Bool enableValidationLayers = true;
@@ -862,8 +861,6 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
     }
 }
 
-u16 numIndices = 11484;
-
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
                                     u32             imageIndex)
@@ -919,22 +916,28 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     scissor.extent = renderer->swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    VkBuffer     vertexBuffers[] = {renderer->vertexBuffer};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
-                           offsets);
+    for (size_t i = 0; i < renderer->renderObjects->size; i++)
+    {
+        skRenderObject* obj =
+            (skRenderObject*)skVector_Get(renderer->renderObjects, i);
 
-    vkCmdBindIndexBuffer(commandBuffer, renderer->indexBuffer, 0,
-                         VK_INDEX_TYPE_UINT32);
+        // Bind vertex and index buffers for this object
+        VkBuffer     vertexBuffers[] = {obj->vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
+                               offsets);
+        vkCmdBindIndexBuffer(commandBuffer, obj->indexBuffer, 0,
+                             VK_INDEX_TYPE_UINT32);
 
-    VkDescriptorSet* dSet = (VkDescriptorSet*)skVector_Get(
-        renderer->descriptorSets, renderer->currentFrame);
+        // Bind descriptor set for this object
+        vkCmdBindDescriptorSets(
+            commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            renderer->pipelineLayout, 0, 1,
+            &obj->descriptorSets[renderer->currentFrame], 0, NULL);
 
-    vkCmdBindDescriptorSets(
-        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        renderer->pipelineLayout, 0, 1, dSet, 0, NULL);
-
-    vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+        // Draw this object
+        vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
+    }
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1167,33 +1170,33 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
 
 void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 {
-    double currentTime = glfwGetTime();
-    double time = currentTime - renderer->startTime;
+    for (size_t i = 0; i < renderer->renderObjects->size; i++)
+    {
+        skRenderObject* obj =
+            (skRenderObject*)skVector_Get(renderer->renderObjects, i);
 
-    void* map = *(void**)skVector_Get(renderer->uniformBuffersMap,
-                                      renderer->currentFrame);
+        skUniformBufferObject ubo = {0};
 
-    skUniformBufferObject ubo = {0};
+        // Use the object's transform matrix
+        glm_mat4_copy(obj->transform, ubo.model);
 
-    glm_mat4_identity(ubo.model);
+        // Set view and projection matrices (same for all objects)
+        glm_lookat((vec3) {2.0f, 2.0f, 2.0f},
+                   (vec3) {0.0f, 0.0f, 0.0f},
+                   (vec3) {0.0f, 0.0f, 1.0f}, ubo.view);
 
-    glm_rotate(ubo.model, time * glm_rad(90.0f),
-               (vec3) {0.0f, 0.0f, 1.0f});
-    glm_lookat((vec3) {2.0f, 2.0f, 2.0f}, (vec3) {0.0f, 0.0f, 0.0f},
-               (vec3) {0.0f, 0.0f, 1.0f}, ubo.view);
+        mat4 proj;
+        glm_perspective(glm_rad(45.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.1f, 100.0f, proj);
+        proj[1][1] *= -1.0f;
+        glm_mat4_copy(proj, ubo.proj);
 
-    // Create projection matrix
-    mat4 proj;
-    glm_perspective(glm_rad(45.0f),
-                    renderer->swapchainExtent.width /
-                        (float)renderer->swapchainExtent.height,
-                    0.1f, 100.0f, proj);
-
-    // Adjust for Vulkan's coordinate system
-    proj[1][1] *= -1.0f;           // Flip Y-axis
-    glm_mat4_copy(proj, ubo.proj); // Copy to ubo
-
-    memcpy(map, &ubo, sizeof(ubo));
+        // Update this object's uniform buffer
+        memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
+               sizeof(ubo));
+    }
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer)
@@ -1598,93 +1601,6 @@ void skRenderer_CopyBuffer(skRenderer* renderer, VkBuffer srcBuffer,
     skRenderer_EndSingleTimeCommands(renderer, commandBuffer);
 }
 
-void skRenderer_CreateVertexBuffer(skRenderer* renderer)
-{
-    // const skVertex vertices[] = {
-    //     {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    //     {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    //     {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    //     {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-    //     {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    //     {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    //     {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    //     {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-
-    skMesh* mesh = skVector_Get(renderer->model.meshes, 0);
-    u16     numVertices = mesh->vertices->size;
-
-    size_t bufferSize = sizeof(skVertex) * numVertices;
-
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &stagingBuffer, &stagingMemory);
-
-    void* data;
-    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
-                &data);
-
-    memcpy(data, mesh->vertices->data,
-           sizeof(skVertex) * numVertices);
-
-    vkUnmapMemory(renderer->device, stagingMemory);
-
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &renderer->vertexBuffer,
-                            &renderer->vertexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, stagingBuffer,
-                          renderer->vertexBuffer, bufferSize);
-
-    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
-    vkFreeMemory(renderer->device, stagingMemory, NULL);
-}
-
-void skRenderer_CreateIndexBuffer(skRenderer* renderer)
-{
-    skMesh* mesh = skVector_Get(renderer->model.meshes, 0);
-    numIndices = mesh->indices->size;
-
-    size_t bufferSize = sizeof(mesh->indices[0]) * numIndices;
-
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &stagingBuffer, &stagingMemory);
-
-    void* data;
-    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
-                &data);
-
-    memcpy(data, mesh->indices->data,
-           sizeof(u32) * numIndices);
-
-    vkUnmapMemory(renderer->device, stagingMemory);
-
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &renderer->indexBuffer,
-                            &renderer->indexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, stagingBuffer,
-                          renderer->indexBuffer, bufferSize);
-
-    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
-    vkFreeMemory(renderer->device, stagingMemory, NULL);
-}
-
 void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
 {
     VkDescriptorSetLayoutBinding uboLayoutBinding = {0};
@@ -1720,38 +1636,28 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     }
 }
 
-void skRenderer_CreateUniformBuffers(skRenderer* renderer)
+void skRenderer_AddRenderObject(skRenderer*     renderer,
+                                skRenderObject* object)
 {
     VkDeviceSize bufferSize = sizeof(skUniformBufferObject);
 
-    renderer->uniformBuffers = skVector_Create(sizeof(VkBuffer), 2);
-    renderer->uniformBuffersMemory =
-        skVector_Create(sizeof(VkDeviceMemory), 2);
-    renderer->uniformBuffersMap = skVector_Create(sizeof(void*), 2);
-    skVector_Resize(renderer->uniformBuffers, SK_FRAMES_IN_FLIGHT);
-    skVector_Resize(renderer->uniformBuffersMemory,
-                    SK_FRAMES_IN_FLIGHT);
-    skVector_Resize(renderer->uniformBuffersMap, SK_FRAMES_IN_FLIGHT);
-
-    for (size_t i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
-        VkBuffer* buf =
-            (VkBuffer*)skVector_Get(renderer->uniformBuffers, i);
-        VkDeviceMemory* mem = (VkDeviceMemory*)skVector_Get(
-            renderer->uniformBuffersMemory, i);
-        void** mapPtr =
-            (void**)skVector_Get(renderer->uniformBuffersMap,
-                                 i); // Get pointer to vector element
-
         skRenderer_CreateBuffer(
             renderer, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            buf, mem);
+            &object->uniformBuffers[frame],
+            &object->uniformBuffersMemory[frame]);
 
-        // Store mapped pointer directly in the vector
-        vkMapMemory(renderer->device, *mem, 0, bufferSize, 0, mapPtr);
+        vkMapMemory(renderer->device,
+                    object->uniformBuffersMemory[frame], 0,
+                    bufferSize, 0, &object->uniformBuffersMap[frame]);
     }
+    
+    skRenderer_CreateDescriptorSetsForObject(renderer, object);
+    
+    skVector_PushBack(renderer->renderObjects, object);
 }
 
 void skRenderer_CreateDescriptorPool(skRenderer* renderer)
@@ -1759,15 +1665,17 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
     VkDescriptorPoolSize poolSizes[] = {{0}, {0}};
 
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = SK_FRAMES_IN_FLIGHT;
+    poolSizes[0].descriptorCount =
+        SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = SK_FRAMES_IN_FLIGHT;
+    poolSizes[1].descriptorCount =
+        SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = SK_FRAMES_IN_FLIGHT;
+    poolInfo.maxSets = SK_FRAMES_IN_FLIGHT * SK_MAX_RENDER_OBJECTS;
 
     if (vkCreateDescriptorPool(renderer->device, &poolInfo, NULL,
                                &renderer->descriptorPool) !=
@@ -1777,68 +1685,56 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
     }
 }
 
-void skRenderer_CreateDescriptorSets(skRenderer* renderer)
+void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
+                                              skRenderObject* obj)
 {
-    skVector* layouts = skVector_Create(sizeof(VkDescriptorSetLayout),
-                                        SK_FRAMES_IN_FLIGHT);
-    renderer->descriptorSets =
-        skVector_Create(sizeof(VkDescriptorSet), SK_FRAMES_IN_FLIGHT);
-
+    VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
     for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
     {
-        skVector_PushBack(layouts, &renderer->descriptorSetLayout);
+        layouts[i] = renderer->descriptorSetLayout;
     }
 
     VkDescriptorSetAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = renderer->descriptorPool;
     allocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
-    allocInfo.pSetLayouts = (VkDescriptorSetLayout*)layouts->data;
+    allocInfo.pSetLayouts = layouts;
 
-    skVector_Resize(renderer->descriptorSets, SK_FRAMES_IN_FLIGHT);
-
-    if (vkAllocateDescriptorSets(
-            renderer->device, &allocInfo,
-            (VkDescriptorSet*)renderer->descriptorSets->data) !=
-        VK_SUCCESS)
+    if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
+                                 obj->descriptorSets) != VK_SUCCESS)
     {
-        printf("SK ERROR: Failed to allocate descriptor sets.");
+        printf("SK ERROR: Failed to allocate descriptor sets for "
+               "object.");
     }
 
-    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    // Update descriptor sets
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
-        VkBuffer* buf =
-            (VkBuffer*)skVector_Get(renderer->uniformBuffers, i);
-        VkDescriptorSet* set = (VkDescriptorSet*)skVector_Get(
-            renderer->descriptorSets, i);
-
         VkDescriptorBufferInfo bufferInfo = {0};
-        bufferInfo.buffer = *buf;
+        bufferInfo.buffer = obj->uniformBuffers[frame];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(skUniformBufferObject);
 
         VkDescriptorImageInfo imageInfo = {0};
         imageInfo.imageLayout =
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = renderer->textureImageView;
-        imageInfo.sampler = renderer->textureSampler;
+        imageInfo.imageView = obj->textureImageView;
+        imageInfo.sampler = obj->textureSampler;
 
         VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = *set;
+        descriptorWrites[0].dstSet = obj->descriptorSets[frame];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType =
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &bufferInfo;
-        descriptorWrites[0].pImageInfo = NULL;
-        descriptorWrites[0].pTexelBufferView = NULL;
 
         descriptorWrites[1].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = *set;
+        descriptorWrites[1].dstSet = obj->descriptorSets[frame];
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType =
@@ -1931,12 +1827,172 @@ void skRenderer_TransitionImageLayout(skRenderer* renderer,
     skRenderer_EndSingleTimeCommands(renderer, commandBuffer);
 }
 
-void skRenderer_CreateTextureImage(skRenderer* renderer)
+Bool skHasStencilComponent(VkFormat format)
 {
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+           format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+skRenderer skRenderer_Create(skWindow* window)
+{
+    skRenderer  renderer = {0};
+    skRenderer* rendererPtr = &renderer;
+
+    renderer.currentFrame = 0;
+    renderer.window = window;
+
+    skRenderer_CreateInstance(rendererPtr);
+    skRenderer_CreateSurface(rendererPtr, window);
+    skRenderer_CreateDebugMessenger(rendererPtr);
+    skRenderer_CreatePhysicalDevice(rendererPtr);
+    skRenderer_CreateLogicalDevice(rendererPtr);
+    skRenderer_CreateSwapchain(&renderer, window);
+    skRenderer_CreateImageViews(&renderer);
+    skRenderer_CreateRenderPass(&renderer);
+    skRenderer_CreateDescriptorSetLayout(&renderer);
+    skRenderer_CreateGraphicsPipeline(&renderer);
+    skRenderer_CreateCommandPool(&renderer);
+    skRenderer_CreateDepthResources(&renderer);
+    skRenderer_CreateFramebuffers(&renderer);
+    skRenderer_CreateDescriptorPool(&renderer);
+    skRenderer_CreateCommandBuffers(&renderer);
+    skRenderer_CreateSyncObjects(&renderer);
+
+    return renderer;
+}
+
+void skRenderer_InitializeVulkan(skRenderer* renderer,
+                                 skWindow*   window)
+{
+    renderer->currentFrame = 0;
+    renderer->window = window;
+
+    renderer->renderObjects =
+        skVector_Create(sizeof(skRenderObject), 10);
+
+    skRenderer_CreateInstance(renderer);
+    skRenderer_CreateSurface(renderer, window);
+    skRenderer_CreateDebugMessenger(renderer);
+    skRenderer_CreatePhysicalDevice(renderer);
+    skRenderer_CreateLogicalDevice(renderer);
+    skRenderer_CreateSwapchain(renderer, window);
+    skRenderer_CreateImageViews(renderer);
+    skRenderer_CreateRenderPass(renderer);
+    skRenderer_CreateDescriptorSetLayout(renderer);
+    skRenderer_CreateGraphicsPipeline(renderer);
+    skRenderer_CreateCommandPool(renderer);
+    skRenderer_CreateDepthResources(renderer);
+    skRenderer_CreateFramebuffers(renderer);
+    skRenderer_CreateDescriptorPool(renderer);
+}
+
+void skRenderer_InitializeUniformsAndDescriptors(skRenderer* renderer)
+{
+    skRenderer_CreateCommandBuffers(renderer);
+    skRenderer_CreateSyncObjects(renderer);
+}
+
+void skRenderer_Destroy(skRenderer* renderer)
+{
+    if (enableValidationLayers)
+    {
+        skDestroyDebugUtilsMessengerEXT(
+            renderer->instance, renderer->debugMessenger, NULL);
+    }
+
+    vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
+    vkDestroyDevice(renderer->device, NULL);
+    vkDestroyInstance(renderer->instance, NULL);
+    vkDestroyPipelineLayout(renderer->device,
+                            renderer->pipelineLayout, NULL);
+    vkDestroyPipeline(renderer->device, renderer->pipeline, NULL);
+    vkDestroyRenderPass(renderer->device, renderer->renderPass, NULL);
+}
+
+skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
+                                              skModel*    model,
+                                              const char* texturePath)
+{
+    skRenderObject obj = {0};
+
+    // Create vertex buffer
+
+    skMesh* mesh = skVector_Get(model->meshes, 0);
+    u16     numVertices = mesh->vertices->size;
+
+    obj.indexCount = mesh->indices->size;
+
+    size_t bufferSize = sizeof(skVertex) * numVertices;
+
+    VkBuffer       stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &stagingBuffer, &stagingMemory);
+
+    void* data;
+    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
+                &data);
+
+    memcpy(data, mesh->vertices->data,
+           sizeof(skVertex) * numVertices);
+
+    vkUnmapMemory(renderer->device, stagingMemory);
+
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &obj.vertexBuffer,
+                            &obj.vertexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, stagingBuffer, obj.vertexBuffer,
+                          bufferSize);
+
+    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
+    vkFreeMemory(renderer->device, stagingMemory, NULL);
+
+    // Create index buffer
+
+    size_t indexBufferSize =
+        sizeof(mesh->indices[0]) * obj.indexCount;
+
+    VkBuffer       indexStagingBuffer;
+    VkDeviceMemory indexStagingMemory;
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &indexStagingBuffer, &indexStagingMemory);
+
+    void* indexData;
+    vkMapMemory(renderer->device, indexStagingMemory, 0,
+                indexBufferSize, 0, &indexData);
+
+    memcpy(indexData, mesh->indices->data,
+           sizeof(u32) * obj.indexCount);
+
+    vkUnmapMemory(renderer->device, indexStagingMemory);
+
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &obj.indexBuffer, &obj.indexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
+                          obj.indexBuffer, indexBufferSize);
+
+    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
+    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
+
+    // Create texture image
+
     int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels =
-        stbi_load("res/room.png", &texWidth, &texHeight,
-                  &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels)
@@ -1944,20 +2000,20 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
         printf("SK ERROR: Failed to load texture image.");
     }
 
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
 
-    skRenderer_CreateBuffer(renderer, imageSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &stagingBuffer, &stagingBufferMemory);
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
 
-    void* data;
-    vkMapMemory(renderer->device, stagingBufferMemory, 0, imageSize,
-                0, &data);
-    memcpy(data, pixels, imageSize);
-    vkUnmapMemory(renderer->device, stagingBufferMemory);
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
 
     stbi_image_free(pixels);
 
@@ -1965,32 +2021,26 @@ void skRenderer_CreateTextureImage(skRenderer* renderer)
         renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->textureImage,
-        &renderer->textureImageMemory);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
+        &obj.textureImageMemory);
 
     skRenderer_TransitionImageLayout(
-        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, stagingBuffer,
-                                 renderer->textureImage,
-                                 (u32)(texWidth), (u32)(texHeight));
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.textureImage, (u32)(texWidth),
+                                 (u32)(texHeight));
 
     skRenderer_TransitionImageLayout(
-        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-}
 
-void skRenderer_CreateTextureImageView(skRenderer* renderer)
-{
-    renderer->textureImageView = skRenderer_CreateImageView(
-        renderer, renderer->textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+    obj.textureImageView = skRenderer_CreateImageView(
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_ASPECT_COLOR_BIT);
-}
 
-void skRenderer_CreateTextureSampler(skRenderer* renderer)
-{
     VkSamplerCreateInfo samplerInfo = {0};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -2017,73 +2067,12 @@ void skRenderer_CreateTextureSampler(skRenderer* renderer)
     samplerInfo.maxLod = 0.0f;
 
     if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &renderer->textureSampler) != VK_SUCCESS)
+                        &obj.textureSampler) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create texture sampler.");
     }
-}
 
-Bool skHasStencilComponent(VkFormat format)
-{
-    return format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
-           format == VK_FORMAT_D24_UNORM_S8_UINT;
-}
+    glm_mat4_identity(obj.transform);
 
-void skRenderer_LoadModel(skRenderer* renderer)
-{
-    renderer->model = skModel_Create();
-    skModel_Load(&renderer->model, "res/room.fbx");
-}
-
-skRenderer skRenderer_Create(skWindow* window)
-{
-    skRenderer  renderer = {0};
-    skRenderer* rendererPtr = &renderer;
-
-    renderer.currentFrame = 0;
-    renderer.window = window;
-
-    skRenderer_CreateInstance(rendererPtr);
-    skRenderer_CreateSurface(rendererPtr, window);
-    skRenderer_CreateDebugMessenger(rendererPtr);
-    skRenderer_CreatePhysicalDevice(rendererPtr);
-    skRenderer_CreateLogicalDevice(rendererPtr);
-    skRenderer_CreateSwapchain(&renderer, window);
-    skRenderer_CreateImageViews(&renderer);
-    skRenderer_CreateRenderPass(&renderer);
-    skRenderer_CreateDescriptorSetLayout(&renderer);
-    skRenderer_CreateGraphicsPipeline(&renderer);
-    skRenderer_CreateCommandPool(&renderer);
-    skRenderer_CreateDepthResources(&renderer);
-    skRenderer_CreateFramebuffers(&renderer);
-    skRenderer_CreateTextureImage(&renderer);
-    skRenderer_CreateTextureImageView(&renderer);
-    skRenderer_CreateTextureSampler(&renderer);
-    skRenderer_LoadModel(&renderer);
-    skRenderer_CreateVertexBuffer(&renderer);
-    skRenderer_CreateIndexBuffer(&renderer);
-    skRenderer_CreateUniformBuffers(&renderer);
-    skRenderer_CreateDescriptorPool(&renderer);
-    skRenderer_CreateDescriptorSets(&renderer);
-    skRenderer_CreateCommandBuffers(&renderer);
-    skRenderer_CreateSyncObjects(&renderer);
-
-    return renderer;
-}
-
-void skRenderer_Destroy(skRenderer* renderer)
-{
-    if (enableValidationLayers)
-    {
-        skDestroyDebugUtilsMessengerEXT(
-            renderer->instance, renderer->debugMessenger, NULL);
-    }
-
-    vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
-    vkDestroyDevice(renderer->device, NULL);
-    vkDestroyInstance(renderer->instance, NULL);
-    vkDestroyPipelineLayout(renderer->device,
-                            renderer->pipelineLayout, NULL);
-    vkDestroyPipeline(renderer->device, renderer->pipeline, NULL);
-    vkDestroyRenderPass(renderer->device, renderer->renderPass, NULL);
+    return obj;
 }
