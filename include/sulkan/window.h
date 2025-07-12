@@ -3,7 +3,6 @@
 #include <GLFW/glfw3.h>
 #include <sulkan/essentials.h>
 
-
 typedef struct
 {
     const char*        title;

@@ -1654,9 +1654,9 @@ void skRenderer_AddRenderObject(skRenderer*     renderer,
                     object->uniformBuffersMemory[frame], 0,
                     bufferSize, 0, &object->uniformBuffersMap[frame]);
     }
-    
+
     skRenderer_CreateDescriptorSetsForObject(renderer, object);
-    
+
     skVector_PushBack(renderer->renderObjects, object);
 }
 

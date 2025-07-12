@@ -16,7 +16,7 @@
 #include <sulkan/ecs_api.h>
 
 #define SK_FRAMES_IN_FLIGHT (2)
-#define SK_MAX_RENDER_OBJECTS (5)
+#define SK_MAX_RENDER_OBJECTS (1000)
 
 typedef struct skSwapchainDetails
 {
@@ -74,11 +74,6 @@ typedef struct skRenderer
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
 
-    skVector* descriptorSets; // VkDescriptorSet
-    skVector* uniformBuffers; // VkBuffer
-    skVector* uniformBuffersMemory; // VkDeviceMemory
-    skVector* uniformBuffersMap; // void*
-  
     VkImage depthImage;
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
@@ -89,6 +84,8 @@ typedef struct skRenderer
 
     VkInstance instance;
 } skRenderer;
+
+struct skRenderObject;
 
 skRenderer skRenderer_Create(skWindow* window);
 void skRenderer_InitializeVulkan(skRenderer* renderer, skWindow* window);
