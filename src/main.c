@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     glm_translate(obj.transform, (vec3) {-1.0f, 0.0f, 0.0f});
 
     skRenderer_AddRenderObject(&renderer, &obj);
-    
+
     skRenderObject obj2 = skRenderObject_CreateFromModel(
         &renderer, &model, "res/room.png");
     glm_translate(obj2.transform, (vec3) {1.0f, 0.0f, 0.0f});
@@ -32,12 +32,25 @@ int main(int argc, char** argv)
     float timeAccumulator = 0.0f;
     char  fpsString[16] = {0};
 
-    // skSceneHandle scene = skECS_CreateScene();
-    // skEntityID ent = skECS_AddEntity(scene);
-    // SK_ECS_ASSIGN(scene, ent, skRenderObject);
+    skSceneHandle scene = skECS_CreateScene();
+
+    skCamera camera = skCamera_Create((vec3) {0.0f, 0.0f, 3.0f},
+                                      (vec3) {0.0f, 1.0f, 0.0f},
+                                      -90.0f, 0.0f, 90.0f);
+
+    skECSState ecsState = {.scene = scene,
+                           .renderer = &renderer,
+                           .camera = &camera,
+                           .window = &window};
+
+    skECS_AddSystem(skCamera_Sys, false);
+
+    skECS_StartStartSystems(&ecsState);
 
     while (!skWindow_ShouldClose(&window))
     {
+        skECS_UpdateSystems(&ecsState);
+
         skRenderer_DrawFrame(&renderer);
 
         float currentTime = glfwGetTime();

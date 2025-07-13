@@ -1180,10 +1180,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         // Use the object's transform matrix
         glm_mat4_copy(obj->transform, ubo.model);
 
-        // Set view and projection matrices (same for all objects)
-        glm_lookat((vec3) {2.0f, 2.0f, 2.0f},
-                   (vec3) {0.0f, 0.0f, 0.0f},
-                   (vec3) {0.0f, 0.0f, 1.0f}, ubo.view);
+        glm_mat4_copy(renderer->viewTransform, ubo.view);
 
         mat4 proj;
         glm_perspective(glm_rad(45.0f),

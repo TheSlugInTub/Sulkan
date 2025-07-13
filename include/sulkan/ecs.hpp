@@ -279,7 +279,9 @@ struct Scene
     std::vector<ComponentPool*> componentPools;
 };
 
-using SysFunc = void (*)();
+struct skECSState;
+
+using SysFunc = void (*)(skECSState*);
 
 // All the systems that are registered
 inline std::vector<SysFunc> systems;
@@ -300,16 +302,16 @@ inline void AddSystem(SysFunc sys, bool startSys)
 
 // Updates all the systems by calling them, call this function every
 // frame to update all the systems each frame
-inline void UpdateSystems()
+inline void UpdateSystems(skECSState* state)
 {
-    for (auto system : systems) { system(); }
+    for (auto system : systems) { system(state); }
 }
 
 // Updates all the start systems, call this only on the start of the
 // program
-inline void StartStartSystems()
+inline void StartStartSystems(skECSState* state)
 {
-    for (auto system : startSystems) { system(); }
+    for (auto system : startSystems) { system(state); }
 }
 
 /*

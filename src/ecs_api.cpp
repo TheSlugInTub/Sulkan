@@ -249,14 +249,14 @@ void skECS_AddSystem(skSystemFunction system,
     AddSystem(system, isStartSystem);
 }
 
-void skECS_UpdateSystems(void)
+void skECS_UpdateSystems(skECSState* state)
 {
-    UpdateSystems();
+    UpdateSystems(state);
 }
 
-void skECS_StartStartSystems(void)
+void skECS_StartStartSystems(skECSState* state)
 {
-    StartStartSystems();
+    StartStartSystems(state);
 }
 
 // Simple object pool for iterators

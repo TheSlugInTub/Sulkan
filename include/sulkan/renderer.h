@@ -78,6 +78,8 @@ typedef struct skRenderer
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
 
+    mat4 viewTransform;
+
     skVector* renderObjects; // skRenderObject
 
     double startTime;

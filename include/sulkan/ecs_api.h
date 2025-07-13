@@ -90,12 +90,14 @@ void  skECS_RemoveComponent(skSceneHandle scene, skEntityID entity,
         scene, entity,                                       \
         SK_ECS_COMPONENT_TYPE_N(component_name, size))
 
+typedef struct skECSState skECSState;
+
 // System management
-typedef void (*skSystemFunction)();
+typedef void (*skSystemFunction)(skECSState*);
 void skECS_AddSystem(skSystemFunction system,
                      bool isStartSystem);
-void skECS_UpdateSystems(void);
-void skECS_StartStartSystems(void);
+void skECS_UpdateSystems(skECSState* state);
+void skECS_StartStartSystems(skECSState* state);
 
 // Entity iteration
 typedef struct skEntityIterator_t* skEntityIteratorHandle;
