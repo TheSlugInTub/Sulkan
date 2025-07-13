@@ -24,6 +24,13 @@ int main(int argc, char** argv)
 
     skRenderer_AddRenderObject(&renderer, &obj2);
 
+    skRenderObject obj3 =
+        skRenderObject_CreateFromSprite(&renderer, "res/room.png");
+    glm_translate(obj3.transform, (vec3) {0.0f, 0.0f, 0.0f});
+    glm_scale(obj3.transform, (vec3) {1.0f, 1.0f, 1.0f});
+
+    skRenderer_AddRenderObject(&renderer, &obj3);
+
     skRenderer_InitializeUniformsAndDescriptors(&renderer);
 
     float fps = 0.0f;

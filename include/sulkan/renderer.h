@@ -119,6 +119,8 @@ typedef struct skRenderObject
 skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
                                               skModel*    model,
                                               const char* texturePath);
+skRenderObject skRenderObject_CreateFromSprite(skRenderer* renderer,
+                                              const char* texturePath);
 void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
                                               skRenderObject* obj);
 void skRenderer_AddRenderObject(skRenderer*     renderer,

@@ -2073,3 +2073,176 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
 
     return obj;
 }
+
+skRenderObject
+skRenderObject_CreateFromSprite(skRenderer* renderer,
+                                const char* texturePath)
+{
+    skRenderObject obj = {0};
+
+    u16 numVertices = 4;
+
+    const skVertex vertices[] = {
+        {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+        {{0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        {{0.5f, 0.0f, 0.5f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{-0.5f, 0.0f, 0.5f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    };
+
+    size_t vertexBufferSize = sizeof(skVertex) * numVertices;
+
+    VkBuffer       vertexStagingBuffer;
+    VkDeviceMemory vertexStagingMemory;
+    skRenderer_CreateBuffer(
+        renderer, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &vertexStagingBuffer, &vertexStagingMemory);
+
+    void* vertexData;
+    vkMapMemory(renderer->device, vertexStagingMemory, 0,
+                vertexBufferSize, 0, &vertexData);
+
+    memcpy(vertexData, vertices, vertexBufferSize);
+
+    vkUnmapMemory(renderer->device, vertexStagingMemory);
+
+    skRenderer_CreateBuffer(renderer, vertexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &obj.vertexBuffer,
+                            &obj.vertexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, vertexStagingBuffer,
+                          obj.vertexBuffer, vertexBufferSize);
+
+    vkDestroyBuffer(renderer->device, vertexStagingBuffer, NULL);
+    vkFreeMemory(renderer->device, vertexStagingMemory, NULL);
+
+    // Create index buffer
+
+    const u32 indices[] = {0, 2, 1, 2, 0, 3};
+
+    u32 numIndices = 6;
+
+    obj.indexCount = 6;
+
+    size_t indexBufferSize = sizeof(indices[0]) * numIndices;
+
+    VkBuffer       indexStagingBuffer;
+    VkDeviceMemory indexStagingMemory;
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &indexStagingBuffer, &indexStagingMemory);
+
+    void* indexData;
+    vkMapMemory(renderer->device, indexStagingMemory, 0,
+                indexBufferSize, 0, &indexData);
+
+    memcpy(indexData, indices, sizeof(indices));
+
+    vkUnmapMemory(renderer->device, indexStagingMemory);
+
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &obj.indexBuffer, &obj.indexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
+                          obj.indexBuffer, indexBufferSize);
+
+    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
+    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
+
+    // Create texture image
+
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load texture image.");
+    }
+
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
+        &obj.textureImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.textureImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    obj.textureImageView = skRenderer_CreateImageView(
+        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &obj.textureSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create texture sampler.");
+    }
+
+    glm_mat4_identity(obj.transform);
+
+    return obj;
+}
