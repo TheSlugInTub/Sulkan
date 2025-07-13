@@ -28,39 +28,42 @@ skCamera skCamera_Create(vec3 position, vec3 up, float yaw,
 
 void skCamera_UpdateVectors(skCamera* camera)
 {
+    // Corrected front vector calculation for Z-up system
     camera->front[0] =
         cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-    camera->front[1] = sin(glm_rad(camera->pitch));
-    camera->front[2] =
+    camera->front[1] =
         sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
+    camera->front[2] = sin(glm_rad(camera->pitch));
     glm_normalize(camera->front);
 
+    // Calculate right vector using worldUp (Z-axis)
     glm_cross(camera->front, camera->worldUp, camera->right);
-    glm_cross(camera->right, camera->front, camera->up);
     glm_normalize(camera->right);
+
+    // Calculate real up vector using right and front
+    glm_cross(camera->right, camera->front, camera->up);
     glm_normalize(camera->up);
 
+    // Handle roll if needed
     if (camera->roll != 0.0f)
     {
-        float cosRoll = cos(camera->roll);
-        float sinRoll = sin(camera->roll);
-
-        // Store original right vector
         vec3 originalRight;
         glm_vec3_copy(camera->right, originalRight);
 
-        // Rotate right vector around front
+        float cosRoll = cos(camera->roll);
+        float sinRoll = sin(camera->roll);
+
+        // Rotate right vector
         camera->right[0] =
             cosRoll * originalRight[0] - sinRoll * camera->up[0];
         camera->right[1] =
             cosRoll * originalRight[1] - sinRoll * camera->up[1];
         camera->right[2] =
             cosRoll * originalRight[2] - sinRoll * camera->up[2];
-
-        // Recalculate up vector to be perpendicular to front and
-        // right
-        glm_cross(camera->right, camera->front, camera->up);
         glm_normalize(camera->right);
+
+        // Recalculate up vector
+        glm_cross(camera->right, camera->front, camera->up);
         glm_normalize(camera->up);
     }
 }
@@ -85,7 +88,7 @@ void skCamera_Sys(skECSState* state)
     glm_vec3_copy(state->camera->front, forward);
     glm_vec3_copy(state->camera->right, right);
 
-    // Forward/backward movement (W/S) - preserves Y-axis movement
+    // Forward/backward movement (W/S)
     if (skInput_GetKey(state->window, SK_KEY_W))
     {
         state->camera->position[0] += forward[0] * speed;
@@ -99,7 +102,7 @@ void skCamera_Sys(skECSState* state)
         state->camera->position[2] -= forward[2] * speed;
     }
 
-    // Strafe left/right (A/D) - use camera's right vector
+    // Strafe left/right (A/D)
     if (skInput_GetKey(state->window, SK_KEY_A))
     {
         state->camera->position[0] -= right[0] * speed;
@@ -119,7 +122,6 @@ void skCamera_Sys(skECSState* state)
         double xpos, ypos;
         glfwGetCursorPos(state->window->window, &xpos, &ypos);
 
-        // Fixed the logic - firstMouse should start as true
         if (firstMouse)
         {
             lastX = (float)xpos;
@@ -129,7 +131,8 @@ void skCamera_Sys(skECSState* state)
         else
         {
             float xoffset = (float)xpos - lastX;
-            float yoffset = lastY - (float)ypos; // Reversed Y-axis
+            float yoffset =
+                lastY - (float)ypos; // Reversed for natural scrolling
             lastX = (float)xpos;
             lastY = (float)ypos;
 
@@ -137,22 +140,21 @@ void skCamera_Sys(skECSState* state)
             xoffset *= sensitivity;
             yoffset *= sensitivity;
 
-            state->camera->yaw += xoffset;
+            state->camera->yaw -= xoffset;
             state->camera->pitch += yoffset;
 
-            // Clamp pitch to avoid screen flipping
+            // Constrain pitch to avoid flipping
             if (state->camera->pitch > 89.0f)
                 state->camera->pitch = 89.0f;
             if (state->camera->pitch < -89.0f)
                 state->camera->pitch = -89.0f;
 
-            // Update camera vectors with new angles
+            // Update vectors with new orientation
             skCamera_UpdateVectors(state->camera);
         }
     }
     else
     {
-        // Reset the flag when middle mouse is released
         firstMouse = true;
     }
 
