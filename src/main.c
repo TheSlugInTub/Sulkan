@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     skSceneHandle scene = skECS_CreateScene();
 
     skCamera camera = skCamera_Create((vec3) {0.0f, 0.0f, 3.0f},
-                                      (vec3) {0.0f, 1.0f, 0.0f},
+                                      (vec3) {0.0f, 0.0f, 1.0f},
                                       -90.0f, 0.0f, 90.0f);
 
     skECSState ecsState = {.scene = scene,

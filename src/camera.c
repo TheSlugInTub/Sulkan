@@ -18,8 +18,8 @@ skCamera skCamera_Create(vec3 position, vec3 up, float yaw,
     camera.up[1] = up[1];
     camera.up[2] = up[2];
     camera.worldUp[0] = 0.0f;
-    camera.worldUp[1] = 1.0f;
-    camera.worldUp[2] = 0.0f;
+    camera.worldUp[1] = 0.0f;
+    camera.worldUp[2] = 1.0f;
     camera.front[0] = 0.0f;
     camera.front[1] = 0.0f;
     camera.front[2] = -1.0f;
@@ -79,18 +79,13 @@ float lastX = 0.0f, lastY = 0.0f;
 
 void skCamera_Sys(skECSState* state)
 {
-    // Calculate movement speed
     float speed = 0.001f;
 
-    // Calculate movement vectors based on camera orientation
     vec3 forward, right;
-
     glm_vec3_copy(state->camera->front, forward);
+    glm_vec3_copy(state->camera->right, right);
 
-    // Right vector is perpendicular to forward on the XZ plane
-    glm_cross((vec3) {0.0f, 1.0f, 0.0f}, forward, right);
-    glm_normalize(right);
-
+    // Forward/backward movement (W/S) - preserves Y-axis movement
     if (skInput_GetKey(state->window, SK_KEY_W))
     {
         state->camera->position[0] += forward[0] * speed;
@@ -104,64 +99,61 @@ void skCamera_Sys(skECSState* state)
         state->camera->position[2] -= forward[2] * speed;
     }
 
-    // Strafe left/right (along right vector)
+    // Strafe left/right (A/D) - use camera's right vector
     if (skInput_GetKey(state->window, SK_KEY_A))
     {
-        state->camera->position[0] += right[0] * speed;
-        state->camera->position[2] += right[2] * speed;
+        state->camera->position[0] -= right[0] * speed;
+        state->camera->position[1] -= right[1] * speed;
+        state->camera->position[2] -= right[2] * speed;
     }
     if (skInput_GetKey(state->window, SK_KEY_D))
     {
-        state->camera->position[0] -= right[0] * speed;
-        state->camera->position[2] -= right[2] * speed;
+        state->camera->position[0] += right[0] * speed;
+        state->camera->position[1] += right[1] * speed;
+        state->camera->position[2] += right[2] * speed;
     }
 
+    // Mouse look handling
     if (skInput_GetMouseButton(state->window, SK_MOUSE_BUTTON_MIDDLE))
     {
         double xpos, ypos;
         glfwGetCursorPos(state->window->window, &xpos, &ypos);
 
-        // If this is the first frame of middle mouse press, just
-        // store position
-        if (!firstMouse)
+        // Fixed the logic - firstMouse should start as true
+        if (firstMouse)
         {
             lastX = (float)xpos;
             lastY = (float)ypos;
-            firstMouse = true;
+            firstMouse = false;
         }
         else
         {
-            // Calculate offset
             float xoffset = (float)xpos - lastX;
-            float yoffset = lastY - (float)ypos;
-
-            // Update last position
+            float yoffset = lastY - (float)ypos; // Reversed Y-axis
             lastX = (float)xpos;
             lastY = (float)ypos;
 
-            // Apply sensitivity
             const float sensitivity = 0.1f;
             xoffset *= sensitivity;
             yoffset *= sensitivity;
 
-            // Update camera angles
             state->camera->yaw += xoffset;
             state->camera->pitch += yoffset;
 
-            // Constrain pitch to prevent flipping
+            // Clamp pitch to avoid screen flipping
             if (state->camera->pitch > 89.0f)
                 state->camera->pitch = 89.0f;
             if (state->camera->pitch < -89.0f)
                 state->camera->pitch = -89.0f;
 
-            // Update camera vectors
+            // Update camera vectors with new angles
             skCamera_UpdateVectors(state->camera);
         }
     }
     else
     {
         // Reset the flag when middle mouse is released
-        firstMouse = false;
+        firstMouse = true;
     }
 
     mat4 view;
