@@ -3,12 +3,9 @@
 #include <assert.h>
 #include <synchapi.h>
 #include <stb/stb_image.h>
+#include <sulkan/imgui_layer.h>
 
-#ifdef DEBUG
 static const Bool enableValidationLayers = true;
-#else
-static const Bool enableValidationLayers = true;
-#endif
 
 VkVertexInputBindingDescription skVertex_GetBindingDescription()
 {
@@ -867,7 +864,7 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 {
     VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = NULL;
 
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
@@ -938,6 +935,12 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
     }
+
+    skImGui_NewFrame();
+
+    skImGui_DemoWindow();
+
+    skImGui_EndFrame(commandBuffer);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1218,13 +1221,11 @@ void skRenderer_DrawFrame(skRenderer* renderer)
         renderer->device, renderer->swapchain, UINT64_MAX,
         *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
-    vkResetFences(renderer->device, 1, inFlightFence);
-
-    vkResetCommandBuffer(cmdBuffer, 0);
-
     skRenderer_UpdateUniformBuffers(renderer);
 
     skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex);
+
+    vkResetFences(renderer->device, 1, inFlightFence);
 
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1447,7 +1448,10 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
 
     // Define required device extensions
     const char* deviceExtensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+        VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
 
     VkDeviceCreateInfo deviceCreateInfo = {0};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1458,7 +1462,7 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
     // Enable swapchain extension
-    deviceCreateInfo.enabledExtensionCount = 1;
+    deviceCreateInfo.enabledExtensionCount = 4;
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
 
     if (enableValidationLayers)
@@ -1663,16 +1667,20 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
 
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount =
-        SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT;
+        (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount =
-        SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT;
+        (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT) +
+        SK_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags =
+        VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = SK_FRAMES_IN_FLIGHT * SK_MAX_RENDER_OBJECTS;
+    poolInfo.maxSets = (SK_FRAMES_IN_FLIGHT * SK_MAX_RENDER_OBJECTS) +
+                       SK_FRAMES_IN_FLIGHT;
 
     if (vkCreateDescriptorPool(renderer->device, &poolInfo, NULL,
                                &renderer->descriptorPool) !=
@@ -1887,6 +1895,14 @@ void skRenderer_InitializeUniformsAndDescriptors(skRenderer* renderer)
 {
     skRenderer_CreateCommandBuffers(renderer);
     skRenderer_CreateSyncObjects(renderer);
+}
+
+void skRenderer_InitImGui(skRenderer* renderer)
+{
+    skImGui_Init(renderer->window->window, renderer->instance,
+                 renderer->descriptorPool, renderer->renderPass,
+                 renderer->physicalDevice, renderer->device,
+                 renderer->commandPool, renderer->graphicsQueue);
 }
 
 void skRenderer_Destroy(skRenderer* renderer)

@@ -93,6 +93,7 @@ skRenderer skRenderer_Create(skWindow* window);
 void skRenderer_InitializeVulkan(skRenderer* renderer, skWindow* window);
 void skRenderer_InitializeUniformsAndDescriptors(skRenderer* renderer);
 void skRenderer_DrawFrame(skRenderer* renderer);
+void skRenderer_InitImGui(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
 
 typedef struct skRenderObject
