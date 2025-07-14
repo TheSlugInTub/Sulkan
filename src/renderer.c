@@ -938,7 +938,15 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
     skImGui_NewFrame();
 
-    skImGui_DemoWindow();
+    skImGui_Begin("Slug's Window!");
+    skImGui_Button("Slugma");
+    skImGui_Text("Click for enlightenment");
+    skImGui_End();
+    
+    skImGui_Begin("Evil Slug's Window!");
+    skImGui_Button("Shigma");
+    skImGui_Text("Click for incomprehension");
+    skImGui_End();
 
     skImGui_EndFrame(commandBuffer);
 

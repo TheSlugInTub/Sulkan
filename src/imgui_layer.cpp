@@ -38,7 +38,7 @@ void skImGui_Init(struct GLFWwindow* window, VkInstance instance,
     info.Device = device;
     info.RenderPass = renderPass;
     info.PhysicalDevice = physicalDevice;
-    info.ImageCount = SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT;
+    info.ImageCount = SK_FRAMES_IN_FLIGHT;
     info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     info.Subpass = 0;
     info.QueueFamily = ImGui_ImplVulkanH_SelectQueueFamilyIndex(physicalDevice);
@@ -52,38 +52,6 @@ void skImGui_Init(struct GLFWwindow* window, VkInstance instance,
     }, &instance);
 
     ImGui_ImplVulkan_Init(&info);
-
-    VkCommandBufferAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = pool;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfo,
-                             &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo = {0};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo = {0};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo,
-                  VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-
-    vkFreeCommandBuffers(device, pool, 1,
-                         &commandBuffer);
-
-    vkDeviceWaitIdle(device);
 }
 
 void skImGui_NewFrame()
@@ -91,6 +59,34 @@ void skImGui_NewFrame()
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->Pos);
+    ImGui::SetNextWindowSize(viewport->Size);
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
+    window_flags |=
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus |
+                    ImGuiWindowFlags_NoNavFocus;
+    window_flags |= ImGuiWindowFlags_NoBackground; // No background
+
+    // Dockspace flags
+    ImGuiDockNodeFlags dockspace_flags =
+        ImGuiDockNodeFlags_PassthruCentralNode;
+
+    // Begin dockspace
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                        ImVec2(0.0f, 0.0f));
+    ImGui::Begin("DockSpace", nullptr, window_flags);
+    ImGui::PopStyleVar();
+
+    ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f),
+                     dockspace_flags);
+
+    ImGui::End(); // End dockspace window
 }
 
 void skImGui_EndFrame(VkCommandBuffer commandBuffer)
@@ -101,10 +97,8 @@ void skImGui_EndFrame(VkCommandBuffer commandBuffer)
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
-        GLFWwindow* backup_current_context = glfwGetCurrentContext();
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_current_context);
     }
 }
 

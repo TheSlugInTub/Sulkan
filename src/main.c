@@ -4,7 +4,7 @@
 int main(int argc, char** argv)
 {
     skWindow window =
-        skWindow_Create("Sulkan", 800, 600, false, false);
+        skWindow_Create("Sulkan", 800, 600, false, true);
 
     skModel model = skModel_Create();
     skModel_Load(&model, "res/room.fbx");
