@@ -21,7 +21,7 @@ typedef unsigned long long skEntityID;
 skSceneHandle skECS_CreateScene(void);
 void          skECS_DestroyScene(skSceneHandle scene);
 void          skECS_ClearScene(skSceneHandle scene);
-int           skECS_EntityCount(skSceneHandle);
+int           skECS_EntityCount(skSceneHandle scene);
 
 // Entity management
 skEntityID skECS_AddEntity(skSceneHandle scene);

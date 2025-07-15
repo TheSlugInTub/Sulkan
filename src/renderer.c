@@ -4,6 +4,7 @@
 #include <synchapi.h>
 #include <stb/stb_image.h>
 #include <sulkan/imgui_layer.h>
+#include <sulkan/editor.h>
 
 static const Bool enableValidationLayers = true;
 
@@ -860,7 +861,8 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
 
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
-                                    u32             imageIndex)
+                                    u32             imageIndex,
+                                    skEditor* editor)
 {
     VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -938,15 +940,9 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
     skImGui_NewFrame();
 
-    skImGui_Begin("Slug's Window!");
-    skImGui_Button("Slugma");
-    skImGui_Text("Click for enlightenment");
-    skImGui_End();
-    
-    skImGui_Begin("Evil Slug's Window!");
-    skImGui_Button("Shigma");
-    skImGui_Text("Click for incomprehension");
-    skImGui_End();
+    skEditor_DrawHierarchy(editor);
+    skEditor_DrawInspector(editor);
+    skEditor_DrawTray(editor);
 
     skImGui_EndFrame(commandBuffer);
 
@@ -1207,7 +1203,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     }
 }
 
-void skRenderer_DrawFrame(skRenderer* renderer)
+void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
 {
     u32 currentFrame = renderer->currentFrame;
 
@@ -1231,7 +1227,7 @@ void skRenderer_DrawFrame(skRenderer* renderer)
 
     skRenderer_UpdateUniformBuffers(renderer);
 
-    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex);
+    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex, editor);
 
     vkResetFences(renderer->device, 1, inFlightFence);
 

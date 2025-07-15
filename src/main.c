@@ -46,6 +46,8 @@ int main(int argc, char** argv)
     skEntityID ent = skECS_AddEntity(scene);
 
     SK_ECS_ASSIGN(scene, ent, skTransform);
+    skName* name = SK_ECS_ASSIGN(scene, ent, skName);
+    strcpy(name->name, "Ent");
 
     skCamera camera = skCamera_Create((vec3) {0.0f, 3.0f, 0.0f},
                                       (vec3) {0.0f, 0.0f, 1.0f},
@@ -57,6 +59,8 @@ int main(int argc, char** argv)
                            .camera = &camera,
                            .window = &window};
 
+    skEditor editor = {.ecsState = &ecsState};
+
     skECS_AddSystem(skCamera_Sys, false);
 
     skECS_StartStartSystems(&ecsState);
@@ -65,7 +69,7 @@ int main(int argc, char** argv)
     {
         skECS_UpdateSystems(&ecsState);
 
-        skRenderer_DrawFrame(&renderer);
+        skRenderer_DrawFrame(&renderer, &editor);
 
         float currentTime = glfwGetTime();
         float elapsed = currentTime - lastTime;

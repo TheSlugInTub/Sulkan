@@ -2,8 +2,6 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include <sstream>
-#include <algorithm>
 #include <cctype>
 
 enum Type
@@ -27,6 +25,8 @@ struct Variable
     Type        type;
     std::string typeString;
     std::string identifier;
+    bool        isArray = false;
+    int         arrayLength = 0;
 };
 
 struct Structure
@@ -35,8 +35,8 @@ struct Structure
     std::string           identifier;
 };
 
-// Helper function to trim whitespace
-std::string trim(const std::string& str)
+// Helper function to Trim whitespace
+std::string Trim(const std::string& str)
 {
     size_t first = str.find_first_not_of(" \t\n\r");
     if (first == std::string::npos)
@@ -46,13 +46,13 @@ std::string trim(const std::string& str)
 }
 
 // Helper function to check if a character is valid for identifiers
-bool isValidIdentifierChar(char ch)
+bool IsValidIdentifierChar(char ch)
 {
     return std::isalnum(ch) || ch == '_';
 }
 
-// Helper function to extract words from a line
-std::vector<std::string> extractWords(const std::string& line)
+// Helper function to Extract words from a line
+std::vector<std::string> ExtractWords(const std::string& line)
 {
     std::vector<std::string> words;
     std::string              word;
@@ -61,7 +61,7 @@ std::vector<std::string> extractWords(const std::string& line)
     {
         char ch = line[i];
 
-        if (isValidIdentifierChar(ch))
+        if (IsValidIdentifierChar(ch))
         {
             word += ch;
         }
@@ -80,8 +80,66 @@ std::vector<std::string> extractWords(const std::string& line)
     return words;
 }
 
+std::pair<std::string, std::pair<bool, int>>
+ParseArrayInfo(const std::string& line)
+{
+    std::string identifier;
+    bool        isArray = false;
+    int         arrayLength = 0;
+
+    // Find the identifier and check for array brackets
+    size_t bracketStart = line.find('[');
+    size_t bracketEnd = line.find(']');
+
+    if (bracketStart != std::string::npos &&
+        bracketEnd != std::string::npos && bracketEnd > bracketStart)
+    {
+        isArray = true;
+
+        // Extract identifier (everything before the bracket)
+        std::string beforeBracket = line.substr(0, bracketStart);
+        std::vector<std::string> words = ExtractWords(beforeBracket);
+        if (!words.empty())
+        {
+            identifier = words.back(); // Last word before bracket is
+                                       // the identifier
+        }
+
+        // Extract array length from between brackets
+        std::string lengthStr = line.substr(
+            bracketStart + 1, bracketEnd - bracketStart - 1);
+        lengthStr = Trim(lengthStr);
+
+        if (!lengthStr.empty())
+        {
+            try
+            {
+                arrayLength = std::stoi(lengthStr);
+            }
+            catch (const std::exception&)
+            {
+                // If conversion fails, default to 0
+                arrayLength = 0;
+            }
+        }
+    }
+    else
+    {
+        // No array brackets, extract identifier normally
+        std::vector<std::string> words = ExtractWords(line);
+        if (words.size() >= 2)
+        {
+            identifier =
+                words[1]; // Second word is typically the identifier
+        }
+    }
+
+    return std::make_pair(identifier,
+                          std::make_pair(isArray, arrayLength));
+}
+
 // Helper function to determine variable type enum
-Type getTypeFromString(const std::string& typeStr)
+Type GetTypeFromString(const std::string& typeStr)
 {
     if (typeStr == "uint8_t" || typeStr == "unsigned char")
         return Type_Uint8;
@@ -108,16 +166,16 @@ Type getTypeFromString(const std::string& typeStr)
     return Type_Custom;
 }
 
-std::vector<Structure> ParseFile(const char* filePath)
+void ParseFile(const char*             filePath,
+               std::vector<Structure>& structures)
 {
-    std::ifstream          file(filePath);
-    std::vector<Structure> structures;
+    std::ifstream file(filePath);
 
     if (!file.is_open())
     {
         std::cerr << "Error: Could not open file " << filePath
                   << std::endl;
-        return structures;
+        return;
     }
 
     std::string              line;
@@ -133,7 +191,7 @@ std::vector<Structure> ParseFile(const char* filePath)
 
     for (size_t i = 0; i < lines.size(); i++)
     {
-        std::string currentLine = trim(lines[i]);
+        std::string currentLine = Trim(lines[i]);
 
         // Skip empty lines and comments (except our special comment)
         if (currentLine.empty() ||
@@ -158,7 +216,7 @@ std::vector<Structure> ParseFile(const char* filePath)
             currentLine.find("struct") != std::string::npos)
         {
             std::vector<std::string> words =
-                extractWords(currentLine);
+                ExtractWords(currentLine);
 
             // Find "struct" keyword and get the identifier
             for (size_t j = 0; j < words.size(); j++)
@@ -207,7 +265,7 @@ std::vector<Structure> ParseFile(const char* filePath)
         if (isParsingStruct)
         {
             std::vector<std::string> words =
-                extractWords(currentLine);
+                ExtractWords(currentLine);
 
             // Need at least 2 words for type and identifier
             if (words.size() >= 2)
@@ -215,14 +273,62 @@ std::vector<Structure> ParseFile(const char* filePath)
                 Variable var;
                 var.typeString = words[0];
                 var.identifier = words[1];
-                var.type = getTypeFromString(var.typeString);
+                var.type = GetTypeFromString(var.typeString);
+
+                auto arrayInfo = ParseArrayInfo(currentLine);
+                var.identifier = arrayInfo.first;
+                var.isArray = arrayInfo.second.first;
+                var.arrayLength = arrayInfo.second.second;
 
                 currentStructure.variables.push_back(var);
             }
         }
     }
+}
 
-    return structures;
+void CreateSource(std::vector<Structure>& structures, char** args,
+                  int argLength)
+{
+    std::ofstream sourceFile("micah.h");
+
+    for (int j = 1; j < argLength; j++)
+    {
+        sourceFile << "#include \"" << args[j] << "\"\n";
+    }
+        
+    sourceFile << "#include \"include/sulkan/imgui_layer.h\"\n";
+
+    for (int i = 0; i < structures.size(); i++)
+    {
+        Structure& structure = structures[i];
+
+        sourceFile << '\n';
+
+        sourceFile << "void " << structure.identifier
+                   << "_DrawComponent(" << structure.identifier
+                   << "* object)\n{\n";
+
+        for (Variable& var : structure.variables)
+        {
+            if (var.typeString == "int")
+            {
+                sourceFile << "    " << "skImGui_InputInt(\""
+                           << var.identifier << "\", &object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "char" && var.isArray)
+            {
+                sourceFile << "    " << "skImGui_InputText(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", "
+                           << var.arrayLength << ", 0);\n";
+            }
+        }
+
+        sourceFile << "}\n\n";
+    }
+
+    sourceFile.close();
 }
 
 int main(int argc, char** argv)
@@ -235,33 +341,36 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    std::vector<Structure> structs;
+
     for (int i = 1; i < argc; i++)
     {
         std::cout << "Parsing file: " << argv[i] << std::endl;
 
-        auto structs = ParseFile(argv[i]);
-
-        if (structs.empty())
-        {
-            std::cout << "No structures found in " << argv[i]
-                      << std::endl;
-            continue;
-        }
-
-        for (const auto& structure : structs)
-        {
-            std::cout << "Structure: " << structure.identifier
-                      << std::endl;
-            std::cout << "Variables:" << std::endl;
-
-            for (const auto& var : structure.variables)
-            {
-                std::cout << "  " << var.typeString << " "
-                          << var.identifier << std::endl;
-            }
-            std::cout << std::endl;
-        }
+        ParseFile(argv[i], structs);
     }
+
+    if (structs.empty())
+    {
+        std::cout << "No structures found" << std::endl;
+    }
+
+    for (const auto& structure : structs)
+    {
+        std::cout << "Structure: " << structure.identifier
+                  << std::endl;
+        std::cout << "Variables:" << std::endl;
+
+        for (const auto& var : structure.variables)
+        {
+            std::cout << "  " << var.typeString << " "
+                      << var.identifier << std::endl;
+            std::cout << "  " << var.arrayLength << " " << '\n';
+        }
+        std::cout << std::endl;
+    }
+
+    CreateSource(structs, argv, argc);
 
     return 0;
 }
