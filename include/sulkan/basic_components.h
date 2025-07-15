@@ -16,6 +16,7 @@ typedef struct skName
     char name[128];
 } skName;
 
+// COMPONENT
 typedef struct skTransform
 {
     mat4 transform;

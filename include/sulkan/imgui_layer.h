@@ -36,6 +36,7 @@ bool skImGui_DragFloat(const char* name, float* val, float speed);
 bool skImGui_DragFloat2(const char* name, float* val, float speed);
 bool skImGui_DragFloat3(const char* name, float* val, float speed);
 bool skImGui_DragFloat4(const char* name, float* val, float speed);
+bool skImGui_DragFloat16(const char* name, float* val, float speed);
 
 bool skImGui_InputInt(const char* name, int* val);
 bool skImGui_InputHex(const char* name, unsigned int* val);

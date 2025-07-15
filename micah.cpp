@@ -33,6 +33,7 @@ struct Structure
 {
     std::vector<Variable> variables;
     std::string           identifier;
+    bool                  isComponent = false;
 };
 
 // Helper function to Trim whitespace
@@ -188,6 +189,7 @@ void ParseFile(const char*             filePath,
     Structure currentStructure;
     bool      isParsingStruct = false;
     bool      foundStructKeyword = false;
+    bool      isComponent = false;
 
     for (size_t i = 0; i < lines.size(); i++)
     {
@@ -208,6 +210,7 @@ void ParseFile(const char*             filePath,
             currentStructure = Structure();
             isParsingStruct = false;
             foundStructKeyword = false;
+            isComponent = true;
             continue;
         }
 
@@ -255,7 +258,9 @@ void ParseFile(const char*             filePath,
             // Only add structure if it has an identifier
             if (!currentStructure.identifier.empty())
             {
+                currentStructure.isComponent = isComponent;
                 structures.push_back(currentStructure);
+                isComponent = false;
             }
             currentStructure = Structure();
             continue;
@@ -295,12 +300,18 @@ void CreateSource(std::vector<Structure>& structures, char** args,
     {
         sourceFile << "#include \"" << args[j] << "\"\n";
     }
-        
+
     sourceFile << "#include \"include/sulkan/imgui_layer.h\"\n";
+    sourceFile << "#include \"include/sulkan/state.h\"\n";
 
     for (int i = 0; i < structures.size(); i++)
     {
         Structure& structure = structures[i];
+
+        if (!structure.isComponent)
+        {
+            continue;
+        }
 
         sourceFile << '\n';
 
@@ -323,10 +334,64 @@ void CreateSource(std::vector<Structure>& structures, char** args,
                            << var.identifier << ", "
                            << var.arrayLength << ", 0);\n";
             }
+            if (var.typeString == "mat4")
+            {
+                sourceFile << "    " << "skImGui_DragFloat16(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", 2.0f);\n";
+            }
+            if (var.typeString == "vec4")
+            {
+                sourceFile << "    " << "skImGui_DragFloat4(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", 2.0f);\n";
+            }
+            if (var.typeString == "vec3")
+            {
+                sourceFile << "    " << "skImGui_DragFloat3(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", 2.0f);\n";
+            }
+            if (var.typeString == "vec2")
+            {
+                sourceFile << "    " << "skImGui_DragFloat2(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", 2.0f);\n";
+            }
         }
 
-        sourceFile << "}\n\n";
+        sourceFile << "}\n";
     }
+
+    sourceFile << "void Micah_DrawAllComponents(skECSState* state, "
+                  "skEntityID ent)\n{\n";
+
+    sourceFile << "    "
+               << "for (int i = 0; i < skECS_EntityCount(state->scene); "
+                  "i++)\n    {\n";
+
+    for (int i = 0; i < structures.size(); i++)
+    {
+        Structure& structure = structures[i];
+
+        if (!structure.isComponent)
+        {
+            continue;
+        }
+
+        std::string objIdent = structure.identifier + "Obj";
+        sourceFile << "        " << structure.identifier << "* "
+                   << structure.identifier
+                   << "Obj = SK_ECS_GET(state->scene, ent, "
+                   << structure.identifier << ");\n\n";
+        sourceFile << "        if (" << objIdent << " != NULL)\n";
+        sourceFile << "        {\n";
+        sourceFile << "            " << structure.identifier
+                   << "_DrawComponent(" << objIdent << ");\n";
+        sourceFile << "        }\n\n";
+    }
+
+    sourceFile << "    }\n}\n";
 
     sourceFile.close();
 }
@@ -349,7 +414,6 @@ int main(int argc, char** argv)
 
         ParseFile(argv[i], structs);
     }
-
     if (structs.empty())
     {
         std::cout << "No structures found" << std::endl;

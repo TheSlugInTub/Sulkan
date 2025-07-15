@@ -16,10 +16,11 @@ ImFont* mainfont = nullptr;
 extern "C"
 {
 
-void skImGui_Init(struct GLFWwindow* window, VkInstance instance, 
-        VkDescriptorPool descriptorPool,
-        VkRenderPass renderPass, VkPhysicalDevice physicalDevice, VkDevice device,
-        VkCommandPool pool, VkQueue graphicsQueue)
+void skImGui_Init(struct GLFWwindow* window, VkInstance instance,
+                  VkDescriptorPool descriptorPool,
+                  VkRenderPass     renderPass,
+                  VkPhysicalDevice physicalDevice, VkDevice device,
+                  VkCommandPool pool, VkQueue graphicsQueue)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -40,15 +41,20 @@ void skImGui_Init(struct GLFWwindow* window, VkInstance instance,
     info.ImageCount = SK_FRAMES_IN_FLIGHT;
     info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     info.Subpass = 0;
-    info.QueueFamily = ImGui_ImplVulkanH_SelectQueueFamilyIndex(physicalDevice);
+    info.QueueFamily =
+        ImGui_ImplVulkanH_SelectQueueFamilyIndex(physicalDevice);
     info.Queue = graphicsQueue;
     info.MinImageCount = 2;
 
     ImGui_ImplVulkan_LoadFunctions(
-    VK_API_VERSION_1_0,
-    [](const char* function_name, void* user_data) -> PFN_vkVoidFunction {
-        return vkGetInstanceProcAddr(*(VkInstance*)user_data, function_name);
-    }, &instance);
+        VK_API_VERSION_1_0,
+        [](const char* function_name,
+           void*       user_data) -> PFN_vkVoidFunction
+        {
+            return vkGetInstanceProcAddr(*(VkInstance*)user_data,
+                                         function_name);
+        },
+        &instance);
 
     ImGui_ImplVulkan_Init(&info);
 }
@@ -58,7 +64,7 @@ void skImGui_NewFrame()
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    
+
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->Pos);
     ImGui::SetNextWindowSize(viewport->Size);
@@ -91,8 +97,9 @@ void skImGui_NewFrame()
 void skImGui_EndFrame(VkCommandBuffer commandBuffer)
 {
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-    
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+                                    commandBuffer);
+
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
@@ -267,6 +274,22 @@ bool skImGui_DragFloat4(const char* name, float* val, float speed)
     return ImGui::DragFloat4(name, val, speed);
 }
 
+bool skImGui_DragFloat16(const char* name, float* val, float speed)
+{
+    bool valueChanged = false;
+
+    if (ImGui::TreeNode(name))
+    {
+        valueChanged |= ImGui::DragFloat4("##0", &val[0], speed);
+        valueChanged |= ImGui::DragFloat4("##1", &val[4], speed);
+        valueChanged |= ImGui::DragFloat4("##2", &val[8], speed);
+        valueChanged |= ImGui::DragFloat4("##3", &val[12], speed);
+        ImGui::TreePop();
+    }
+
+    return valueChanged;
+}
+
 bool skImGui_InputInt(const char* name, int* val)
 {
     return ImGui::InputInt(name, val);
@@ -274,8 +297,8 @@ bool skImGui_InputInt(const char* name, int* val)
 
 bool skImGui_InputHex(const char* name, unsigned int* val)
 {
-    return ImGui::InputScalar(name, ImGuiDataType_U32, val,
-                              NULL, NULL, "%08X",
+    return ImGui::InputScalar(name, ImGuiDataType_U32, val, NULL,
+                              NULL, "%08X",
                               ImGuiInputTextFlags_CharsHexadecimal);
 }
 
@@ -312,12 +335,13 @@ bool skImGui_InputText(const char* name, char* buffer, size_t size,
     return ImGui::InputText(name, buffer, size, flags);
 }
 
-bool skImGui_InputTextMultiline(const char* name, char* buffer, size_t size,
-                       int flags)
+bool skImGui_InputTextMultiline(const char* name, char* buffer,
+                                size_t size, int flags)
 {
-    return ImGui::InputTextMultiline(name, buffer, size, 
-                             ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), 
-                             ImGuiInputTextFlags_AllowTabInput);
+    return ImGui::InputTextMultiline(
+        name, buffer, size,
+        ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16),
+        ImGuiInputTextFlags_AllowTabInput);
 }
 
 bool skImGui_ColorEdit4(const char* name, float* val)
