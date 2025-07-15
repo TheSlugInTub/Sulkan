@@ -9,7 +9,7 @@ typedef struct
     i16                width;
     i16                height;
     struct GLFWwindow* window;
-    Bool framebufferResized;
+    Bool               framebufferResized;
 } skWindow;
 
 // Initialize a GLFW window and OpenGL context

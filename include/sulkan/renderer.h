@@ -9,7 +9,6 @@
 
 #include <sulkan/essentials.h>
 #include <sulkan/vector.h>
-#include <sulkan/hashmap.h>
 #include <sulkan/window.h>
 #include <cglm/cglm.h>
 #include <sulkan/model.h>
@@ -31,13 +30,6 @@ typedef struct skQueueFamilyIndices
     u32 presentFamily;
     Bool isValid;
 } skQueueFamilyIndices;
-
-typedef enum skShaderType
-{
-    skShaderType_Vertex,
-    skShaderType_Fragment,
-    skShaderType_Geometry
-} skShaderType;
 
 typedef struct skUniformBufferObject
 {
@@ -70,20 +62,13 @@ typedef struct skRenderer
     skVector* renderFinishedSemaphores; // VkSemaphore
     skVector* inFlightFences; // VkFence
     u32 currentFrame;
-
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
-
     VkImage depthImage;
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
-
     mat4 viewTransform;
-
     skVector* renderObjects; // skRenderObject
-
-    double startTime;
-
     VkInstance instance;
 } skRenderer;
 

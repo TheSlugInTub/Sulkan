@@ -5,7 +5,6 @@
 #include <GLFW/glfw3.h>
 
 #define SK_FRAMES_IN_FLIGHT (2)
-#define SK_MAX_RENDER_OBJECTS (1000)
 
 struct skImGuiPayload_t
 {
@@ -104,6 +103,9 @@ void skImGui_EndFrame(VkCommandBuffer commandBuffer)
 
 void skImGui_Terminate()
 {
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplVulkan_Shutdown();
+    ImGui::DestroyContext();
 }
 
 void skImGui_Theme1()
