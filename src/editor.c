@@ -3,6 +3,7 @@
 #include <sulkan/basic_components.h>
 #include <sulkan/input.h>
 #include <assert.h>
+#include "../micah.h"
 
 void skEditor_DrawHierarchy(skEditor* editor)
 {
@@ -107,6 +108,8 @@ void skEditor_DrawInspector(skEditor* editor)
     skSceneHandle scene = editor->ecsState->scene;
 
     skImGui_Begin("Inspector");
+
+    Micah_DrawAllComponents(editor->ecsState, editor->selectedEntity);
 
     // skRegistry_DrawComponents(editor->selectedEntity);
 

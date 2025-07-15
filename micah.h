@@ -11,6 +11,7 @@ void skTransform_DrawComponent(skTransform* object)
 {
     skImGui_DragFloat16("transform", object->transform, 2.0f);
 }
+
 void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
 {
     for (int i = 0; i < skECS_EntityCount(state->scene); i++)

@@ -363,6 +363,8 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         sourceFile << "}\n";
     }
 
+    sourceFile << "\n";
+
     sourceFile << "void Micah_DrawAllComponents(skECSState* state, "
                   "skEntityID ent)\n{\n";
 
