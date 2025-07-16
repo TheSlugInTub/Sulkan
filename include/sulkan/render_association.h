@@ -6,7 +6,7 @@
 // COMPONENT
 typedef struct skRenderAssociation
 {
-    u32 objectIndex;
+    int objectIndex;
     vec3 position;
     vec4 rotation; // Quaternion
     vec3 scale;

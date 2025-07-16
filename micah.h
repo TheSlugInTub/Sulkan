@@ -35,6 +35,8 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* 
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
     {
+        skImGui_InputInt("objectIndex", &object->objectIndex);
+       
         if (skImGui_DragFloat3("position", object->position, 0.1f) || 
             skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
             skImGui_DragFloat3("scale", object->scale, 0.1f))
@@ -55,6 +57,7 @@ skJson skRenderAssociation_SaveComponent(skRenderAssociation* object)
 {
     skJson j = skJson_Create();
 
+    skJson_SaveInt(j, "objectIndex", object->objectIndex);
     skJson_SaveFloat3(j, "position", object->position);
     skJson_SaveFloat4(j, "rotation", object->rotation);
     skJson_SaveFloat3(j, "scale", object->scale);
@@ -63,6 +66,7 @@ skJson skRenderAssociation_SaveComponent(skRenderAssociation* object)
 
 void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
 {
+    skJson_LoadInt(j, "objectIndex", &object->objectIndex);
     skJson_LoadFloat3(j, "position", object->position);
     skJson_LoadFloat4(j, "rotation", object->rotation);
     skJson_LoadFloat3(j, "scale", object->scale);

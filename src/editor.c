@@ -29,6 +29,8 @@ void skEditor_LoadScene(skECSState* state, skSceneHandle scene, const char* file
     Micah_LoadAllComponents(state, j);
 
     skJson_Destroy(j);
+
+    skECS_StartStartSystems(state);
 }
 
 void skEditor_DrawHierarchy(skEditor* editor)
