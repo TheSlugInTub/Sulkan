@@ -50,8 +50,8 @@ typedef void (*skJsonIteratorFunc)(skJson j);
 
 void skJson_Iterate(skJson j, skJsonIteratorFunc sys);
 
-skJson skJson_GetskJsonAtIndex(skJson j, int index);
-int    skJson_GetskJsonArraySize(skJson j);
+skJson skJson_GetArrayElement(skJson j, int index);
+int    skJson_GetArraySize(skJson j);
 bool   skJson_HasKey(skJson j, const char* key);
 
 bool   skJson_SaveToFile(skJson j, const char* filename);

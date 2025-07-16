@@ -119,8 +119,7 @@ void skJson_SaveFloatArray(skJson j, const char* name,
     j->json[name] = values;
 }
 
-size_t skJson_LoadFloatArray(skJson j, const char* name,
-                           float* val)
+size_t skJson_LoadFloatArray(skJson j, const char* name, float* val)
 {
     int index = 0;
     for (const auto& point : j->json[name])
@@ -244,14 +243,14 @@ void skJson_Iterate(skJson j, skJsonIteratorFunc sys)
     }
 }
 
-skJson skJson_GetskJsonAtIndex(skJson j, int index)
+skJson skJson_GetArrayElement(skJson j, int index)
 {
     skJson json = skJson_Create();
     json->json = j->json[index];
     return json;
 }
 
-int skJson_GetskJsonArraySize(skJson j)
+int skJson_GetArraySize(skJson j)
 {
     return j->json.size();
 }
@@ -318,6 +317,7 @@ skJson skJson_LoadFromFile(const char* filename)
         return nullptr;
     }
 }
+
 }
 
 nlohmann::json skJson_GetskJson(skJson j)

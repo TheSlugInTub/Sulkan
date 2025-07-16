@@ -453,7 +453,7 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         }
 
         sourceFile << "    return j;\n}\n\n";
-        
+
         // DESERIALIZATION FUNCTIONS
 
         sourceFile << "void " << structure.identifier
@@ -541,9 +541,99 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         sourceFile << "    }\n\n";
     }
 
-    sourceFile << "}\n";
+    sourceFile << "}\n\n";
+
+    sourceFile
+        << "skJson Micah_SaveAllComponents(skECSState* state)\n{\n";
+
+    sourceFile << "    skJson j = skJson_Create();\n\n";
+    sourceFile
+        << "    for (int i = 0; i < "
+           "skECS_EntityCount(state->scene); i++)\n    {\n      "
+           "  skEntityID ent = skECS_GetEntityAtIndex(state->scene, "
+           "i);\n        skJson entJson = skJson_Create();\n\n";
+
+    for (int i = 0; i < structures.size(); i++)
+    {
+        Structure& structure = structures[i];
+
+        if (!structure.isComponent)
+        {
+            continue;
+        }
+
+        std::string objIdent = structure.identifier + "Obj";
+        sourceFile << "        " << structure.identifier << "* "
+                   << structure.identifier
+                   << "Obj = SK_ECS_GET(state->scene, ent, "
+                   << structure.identifier << ");\n\n";
+        sourceFile << "        if (" << objIdent << " != NULL)\n";
+        sourceFile << "        {\n";
+        sourceFile << "            skJson compJson = "
+                   << structure.identifier << "_SaveComponent("
+                   << objIdent << ");\n";
+        sourceFile
+            << "            skJson_SaveString(compJson, \"type\", \""
+            << structure.identifier << "\");\n";
+        sourceFile
+            << "            skJson_PushBack(entJson, compJson);\n";
+        sourceFile << "            skJson_Destroy(compJson);\n";
+        sourceFile << "        }\n\n";
+    }
+
+    sourceFile << "        skJson_PushBack(j, entJson);\n        skJson_Destroy(entJson);\n    }\n\n   "
+                  " return j;\n}\n";
 
     sourceFile << "\n";
+
+    sourceFile << "\n";
+
+    sourceFile << "void Micah_LoadAllComponents(skECSState* state, "
+                  "skJson j)\n{\n";
+    sourceFile << "    int entityCount = skJson_GetArraySize(j);\n\n";
+    sourceFile
+        << "    for (int i = 0; i < entityCount; i++)\n    {\n";
+    sourceFile
+        << "        skJson entJson = skJson_GetArrayElement(j, i);\n";
+    sourceFile << "        skEntityID ent = "
+                  "skECS_AddEntity(state->scene);\n\n";
+    sourceFile << "        int componentCount = "
+                  "skJson_GetArraySize(entJson);\n\n";
+    sourceFile << "        for (int compIndex = 0; compIndex < "
+                  "componentCount; compIndex++)\n        {\n";
+    sourceFile << "            skJson compJson = "
+                  "skJson_GetArrayElement(entJson, compIndex);\n\n";
+    sourceFile << "            char componentType[256];\n";
+    sourceFile << "            skJson_LoadString(compJson, \"type\", "
+                  "componentType);\n\n";
+    sourceFile << "            // Check component type and "
+                  "assign/load accordingly\n";
+    sourceFile << "            if (false) {} // Dummy condition for "
+                  "cleaner generated code\n";
+
+    for (int i = 0; i < structures.size(); i++)
+    {
+        Structure& structure = structures[i];
+
+        if (!structure.isComponent)
+        {
+            continue;
+        }
+
+        sourceFile << "            else if (strcmp(componentType, \""
+                   << structure.identifier << "\") == 0)\n";
+        sourceFile << "            {\n";
+        sourceFile << "                " << structure.identifier
+                   << "* comp = SK_ECS_ASSIGN(state->scene, ent, "
+                   << structure.identifier << ");\n";
+        sourceFile << "                " << structure.identifier
+                   << "_LoadComponent(comp, compJson);\n";
+        sourceFile << "            }\n";
+    }
+
+    sourceFile << "        }\n";
+    sourceFile << "    }\n";
+    sourceFile << "}\n\n";
 
     sourceFile
         << "void Micah_ComponentAddMenu(skECSState* state, "

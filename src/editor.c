@@ -9,16 +9,26 @@
 void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
                         const char* sceneName)
 {
-    skJson json = skJson_Create();
-
-    
-
+    skJson json = Micah_SaveAllComponents(state);
     skJson_SaveToFile(json, sceneName);
     skJson_Destroy(json);
 }
 
-void skEditor_LoadScene(skECSState* state, skSceneHandle scene, skJson j)
+void skEditor_LoadScene(skECSState* state, skSceneHandle scene, const char* filepath)
 {
+    skECS_ClearScene(scene);
+
+    skJson j = skJson_LoadFromFile(filepath);
+
+    if (j == NULL)
+    {
+        printf("SK ERROR: in skEditor_LoadScene, filepath is invalid.");
+        return;
+    }
+
+    Micah_LoadAllComponents(state, j);
+
+    skJson_Destroy(j);
 }
 
 void skEditor_DrawHierarchy(skEditor* editor)
@@ -133,4 +143,17 @@ void skEditor_DrawInspector(skEditor* editor)
 
 void skEditor_DrawTray(skEditor* editor)
 {
+    skImGui_Begin("Tray");
+
+    if (skImGui_Button("Save"))
+    {
+        skEditor_SaveScene(editor->ecsState, editor->ecsState->scene, "scene.json");
+    }
+    
+    if (skImGui_Button("Load"))
+    {
+        skEditor_LoadScene(editor->ecsState, editor->ecsState->scene, "scene.json");
+    }
+
+    skImGui_End();
 }
