@@ -11,3 +11,5 @@ typedef struct skRenderAssociation
     vec4 rotation; // Quaternion
     vec3 scale;
 } skRenderAssociation;
+
+void skRenderAssociation_StartSys(skECSState* state);

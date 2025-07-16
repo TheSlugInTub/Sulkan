@@ -4,6 +4,22 @@
 #include <sulkan/input.h>
 #include <assert.h>
 #include "../micah.h"
+#include <sulkan/json_api.h>
+
+void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
+                        const char* sceneName)
+{
+    skJson json = skJson_Create();
+
+    
+
+    skJson_SaveToFile(json, sceneName);
+    skJson_Destroy(json);
+}
+
+void skEditor_LoadScene(skECSState* state, skSceneHandle scene, skJson j)
+{
+}
 
 void skEditor_DrawHierarchy(skEditor* editor)
 {
@@ -13,7 +29,7 @@ void skEditor_DrawHierarchy(skEditor* editor)
 
     for (int i = 0; i < skECS_EntityCount(scene); i++)
     {
-        
+
         skEntityID ent = skECS_GetEntityAtIndex(scene, i);
 
         if (!skECS_IsEntityValid(ent))
@@ -35,7 +51,7 @@ void skEditor_DrawHierarchy(skEditor* editor)
         if (skInput_GetKeyDown(editor->ecsState->window, SK_KEY_F1))
         {
             skECS_CloneEntity(scene, editor->selectedEntity);
-        }      
+        }
 
         // if (skImGui_BeginDragDropSource(i << 3))
         // {
@@ -84,9 +100,8 @@ void skEditor_DrawHierarchy(skEditor* editor)
     {
         if (skImGui_MenuItem("Add Entity"))
         {
-            skEntityID   ent = skECS_AddEntity(scene);
-
-            skName* name = SK_ECS_ASSIGN(scene, ent, skName);
+            skEntityID ent = skECS_AddEntity(scene);
+            skName*    name = SK_ECS_ASSIGN(scene, ent, skName);
             strcpy(name->name, "Entity");
         }
         skImGui_EndPopup();
@@ -99,46 +114,23 @@ void skEditor_DrawInspector(skEditor* editor)
 {
     if (editor->selectedEntityIndex == -1)
         return;
-    
+
     skSceneHandle scene = editor->ecsState->scene;
 
     skImGui_Begin("Inspector");
 
     Micah_DrawAllComponents(editor->ecsState, editor->selectedEntity);
 
-    // skRegistry_DrawComponents(editor->selectedEntity);
-
     if (skInput_GetKeyDown(editor->ecsState->window, SK_KEY_DELETE))
     {
         skECS_DestroyEntity(scene, editor->selectedEntity);
     }
 
-    // Begin popup menu on right click
-    if (skImGui_BeginPopupContextWindow())
-    {
-        // for (int i = 0; i < g_componentRegistry.registrationCount;
-        //      ++i)
-        // {
-        //     if (skImGui_MenuItem(g_componentRegistry.registrations[i]
-        //                              .componentType))
-        //     {
-        //         // Check if the component doens't already exist and
-        //         // add it if it doenn't
-        //         SK_ECS_ASSIGN_N(
-        //             skState.scene, sk_selectedEntity,
-        //             g_componentRegistry.registrations[i]
-        //                 .componentType,
-        //             g_componentRegistry.registrations[i].size);
-        //     }
-        // }
-
-        skImGui_EndPopup();
-    }
+    Micah_ComponentAddMenu(editor->ecsState, editor->selectedEntity);
 
     skImGui_End();
 }
 
 void skEditor_DrawTray(skEditor* editor)
 {
-
 }

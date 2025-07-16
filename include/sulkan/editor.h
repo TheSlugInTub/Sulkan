@@ -13,3 +13,6 @@ typedef struct skEditor
 void skEditor_DrawHierarchy(skEditor* editor);
 void skEditor_DrawInspector(skEditor* editor);
 void skEditor_DrawTray(skEditor* editor);
+
+void skEditor_SaveScene(skECSState* state);
+void skEditor_LoadScene(skECSState* state);

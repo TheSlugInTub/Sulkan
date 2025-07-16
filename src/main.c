@@ -77,6 +77,7 @@ int main(int argc, char** argv)
     skEditor editor = {.ecsState = &ecsState};
 
     skECS_AddSystem(skCamera_Sys, false);
+    skECS_AddSystem(skRenderAssociation_StartSys, true);
 
     skECS_StartStartSystems(&ecsState);
 

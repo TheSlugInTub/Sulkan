@@ -302,6 +302,8 @@ void CreateSource(std::vector<Structure>& structures, char** args,
 {
     std::ofstream sourceFile("micah.h");
 
+    sourceFile << "#pragma once\n\n";
+
     for (int j = 1; j < argLength; j++)
     {
         sourceFile << "#include \"" << args[j] << "\"\n";
@@ -309,6 +311,13 @@ void CreateSource(std::vector<Structure>& structures, char** args,
 
     sourceFile << "#include \"include/sulkan/imgui_layer.h\"\n";
     sourceFile << "#include \"include/sulkan/state.h\"\n";
+    sourceFile << "#include \"include/sulkan/json_api.h\"\n";
+
+    sourceFile << "\n// micah.h\n";
+    sourceFile << "// Procedurally generated header file for the "
+                  "Sulkan game engine"
+                  "\n// This contains drawer/serializer/deserializer "
+                  "functions for all registered components\n";
 
     for (int i = 0; i < structures.size(); i++)
     {
@@ -381,7 +390,129 @@ void CreateSource(std::vector<Structure>& structures, char** args,
             }
         }
 
-        sourceFile << "    }\n}\n";
+        sourceFile << "    }\n}\n\n";
+
+        // SERIALIZATION FUNCTIONS
+
+        sourceFile << "skJson " << structure.identifier
+                   << "_SaveComponent(" << structure.identifier
+                   << "* object)\n{\n";
+
+        sourceFile << "    skJson j = skJson_Create();\n\n";
+
+        for (Variable& var : structure.variables)
+        {
+            if (var.typeString == "int")
+            {
+                sourceFile << "    " << "skJson_SaveInt(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "char" && var.isArray)
+            {
+                sourceFile << "    " << "skJson_SaveString(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "mat4")
+            {
+                sourceFile << "    " << "skJson_SaveFloat16(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "quat")
+            {
+                sourceFile << "    " << "skJson_SaveFloat4(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec4")
+            {
+                sourceFile << "    " << "skJson_SaveFloat4(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec3")
+            {
+                sourceFile << "    " << "skJson_SaveFloat3(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec2")
+            {
+                sourceFile << "    " << "skJson_SaveFloat2(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "float")
+            {
+                sourceFile << "    " << "skJson_SaveFloat(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+        }
+
+        sourceFile << "    return j;\n}\n\n";
+        
+        // DESERIALIZATION FUNCTIONS
+
+        sourceFile << "void " << structure.identifier
+                   << "_LoadComponent(" << structure.identifier
+                   << "* object, skJson j)\n{\n";
+
+        for (Variable& var : structure.variables)
+        {
+            if (var.typeString == "int")
+            {
+                sourceFile << "    " << "skJson_LoadInt(j, \""
+                           << var.identifier << "\", &object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "char" && var.isArray)
+            {
+                sourceFile << "    " << "skJson_LoadString(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "mat4")
+            {
+                sourceFile << "    " << "skJson_LoadFloat16(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "quat")
+            {
+                sourceFile << "    " << "skJson_LoadFloat4(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec4")
+            {
+                sourceFile << "    " << "skJson_LoadFloat4(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec3")
+            {
+                sourceFile << "    " << "skJson_LoadFloat3(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "vec2")
+            {
+                sourceFile << "    " << "skJson_LoadFloat2(j, \""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ");\n";
+            }
+            if (var.typeString == "float")
+            {
+                sourceFile << "    " << "skJson_LoadFloat(j, \""
+                           << var.identifier << "\", &object->"
+                           << var.identifier << ");\n";
+            }
+        }
+
+        sourceFile << "}\n";
     }
 
     sourceFile << "\n";
@@ -411,6 +542,31 @@ void CreateSource(std::vector<Structure>& structures, char** args,
     }
 
     sourceFile << "}\n";
+
+    sourceFile << "\n";
+
+    sourceFile
+        << "void Micah_ComponentAddMenu(skECSState* state, "
+           "skEntityID ent)\n{\n"
+           "    if (skImGui_BeginPopupContextWindow())\n    {\n";
+
+    for (int i = 0; i < structures.size(); i++)
+    {
+        Structure& structure = structures[i];
+
+        if (!structure.isComponent)
+        {
+            continue;
+        }
+
+        sourceFile << "        if (skImGui_MenuItem(\""
+                   << structure.identifier << "\"))\n        {\n";
+        sourceFile << "            SK_ECS_ASSIGN(state->scene, ent, "
+                   << structure.identifier << ");\n";
+        sourceFile << "        }\n";
+    }
+
+    sourceFile << "\n        skImGui_EndPopup();\n    }\n}\n";
 
     sourceFile.close();
 }
