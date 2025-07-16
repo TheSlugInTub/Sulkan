@@ -85,11 +85,6 @@ void skEditor_DrawHierarchy(skEditor* editor)
         if (skImGui_MenuItem("Add Entity"))
         {
             skEntityID   ent = skECS_AddEntity(scene);
-            skTransform* trans =
-                SK_ECS_ASSIGN(scene, ent, skTransform);
-
-            glm_mat4_identity(trans->transform);
-            glm_scale(trans->transform, (vec3) {1.0f, 1.0f, 1.0f});
 
             skName* name = SK_ECS_ASSIGN(scene, ent, skName);
             strcpy(name->name, "Entity");

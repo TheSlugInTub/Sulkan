@@ -269,6 +269,12 @@ void ParseFile(const char*             filePath,
         // Parse member variables
         if (isParsingStruct)
         {
+            if (currentLine.find("// UNSERIALIZABLE") !=
+                std::string::npos)
+            {
+                continue;
+            }
+
             std::vector<std::string> words =
                 ExtractWords(currentLine);
 
@@ -317,60 +323,71 @@ void CreateSource(std::vector<Structure>& structures, char** args,
 
         sourceFile << "void " << structure.identifier
                    << "_DrawComponent(" << structure.identifier
-                   << "* object)\n{\n";
+                   << "* object, skECSState* state)\n{\n";
+
+        sourceFile << "    if (skImGui_CollapsingHeader(\""
+                   << structure.identifier << "\"))\n    {\n";
 
         for (Variable& var : structure.variables)
         {
             if (var.typeString == "int")
             {
-                sourceFile << "    " << "skImGui_InputInt(\""
+                sourceFile << "        " << "skImGui_InputInt(\""
                            << var.identifier << "\", &object->"
                            << var.identifier << ");\n";
             }
             if (var.typeString == "char" && var.isArray)
             {
-                sourceFile << "    " << "skImGui_InputText(\""
+                sourceFile << "        " << "skImGui_InputText(\""
                            << var.identifier << "\", object->"
                            << var.identifier << ", "
                            << var.arrayLength << ", 0);\n";
             }
             if (var.typeString == "mat4")
             {
-                sourceFile << "    " << "skImGui_DragFloat16(\""
+                sourceFile << "        " << "skImGui_DragFloat16(\""
                            << var.identifier << "\", object->"
-                           << var.identifier << ", 2.0f);\n";
+                           << var.identifier << ", 0.1f);\n";
+            }
+            if (var.typeString == "quat")
+            {
+                sourceFile << "        " << "skImGui_DragFloat4(\""
+                           << var.identifier << "\", object->"
+                           << var.identifier << ", 0.1f);\n";
             }
             if (var.typeString == "vec4")
             {
-                sourceFile << "    " << "skImGui_DragFloat4(\""
+                sourceFile << "        " << "skImGui_DragFloat4(\""
                            << var.identifier << "\", object->"
-                           << var.identifier << ", 2.0f);\n";
+                           << var.identifier << ", 0.1f);\n";
             }
             if (var.typeString == "vec3")
             {
-                sourceFile << "    " << "skImGui_DragFloat3(\""
+                sourceFile << "        " << "skImGui_DragFloat3(\""
                            << var.identifier << "\", object->"
-                           << var.identifier << ", 2.0f);\n";
+                           << var.identifier << ", 0.1f);\n";
             }
             if (var.typeString == "vec2")
             {
-                sourceFile << "    " << "skImGui_DragFloat2(\""
+                sourceFile << "        " << "skImGui_DragFloat2(\""
                            << var.identifier << "\", object->"
-                           << var.identifier << ", 2.0f);\n";
+                           << var.identifier << ", 0.1f);\n";
+            }
+            if (var.typeString == "float")
+            {
+                sourceFile << "        " << "skImGui_DragFloat(\""
+                           << var.identifier << "\", &object->"
+                           << var.identifier << ", 0.1f);\n";
             }
         }
 
-        sourceFile << "}\n";
+        sourceFile << "    }\n}\n";
     }
 
     sourceFile << "\n";
 
     sourceFile << "void Micah_DrawAllComponents(skECSState* state, "
                   "skEntityID ent)\n{\n";
-
-    sourceFile << "    "
-               << "for (int i = 0; i < skECS_EntityCount(state->scene); "
-                  "i++)\n    {\n";
 
     for (int i = 0; i < structures.size(); i++)
     {
@@ -382,18 +399,18 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         }
 
         std::string objIdent = structure.identifier + "Obj";
-        sourceFile << "        " << structure.identifier << "* "
+        sourceFile << "    " << structure.identifier << "* "
                    << structure.identifier
                    << "Obj = SK_ECS_GET(state->scene, ent, "
                    << structure.identifier << ");\n\n";
-        sourceFile << "        if (" << objIdent << " != NULL)\n";
-        sourceFile << "        {\n";
-        sourceFile << "            " << structure.identifier
-                   << "_DrawComponent(" << objIdent << ");\n";
-        sourceFile << "        }\n\n";
+        sourceFile << "    if (" << objIdent << " != NULL)\n";
+        sourceFile << "    {\n";
+        sourceFile << "        " << structure.identifier
+                   << "_DrawComponent(" << objIdent << ", state);\n";
+        sourceFile << "    }\n\n";
     }
 
-    sourceFile << "    }\n}\n";
+    sourceFile << "}\n";
 
     sourceFile.close();
 }

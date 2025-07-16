@@ -6,3 +6,4 @@
 #include <sulkan/state.h>
 #include <sulkan/basic_components.h>
 #include <sulkan/editor.h>
+#include <sulkan/render_association.h>

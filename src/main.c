@@ -11,18 +11,41 @@ int main(int argc, char** argv)
 
     skRenderer renderer = {0};
     skRenderer_InitializeVulkan(&renderer, &window);
+    
+    skSceneHandle scene = skECS_CreateScene();
+
+    skEntityID ent1 = skECS_AddEntity(scene);
+
+    skRenderAssociation* assoc = SK_ECS_ASSIGN(scene, ent1, skRenderAssociation);
+    assoc->objectIndex = renderer.renderObjects->size;
+    skName* name = SK_ECS_ASSIGN(scene, ent1, skName);
+    strcpy(name->name, "Ent");
 
     skRenderObject obj = skRenderObject_CreateFromModel(
         &renderer, &model, "res/room.png");
     glm_translate(obj.transform, (vec3) {-1.0f, 0.0f, 0.0f});
 
     skRenderer_AddRenderObject(&renderer, &obj);
+    
+    skEntityID ent2 = skECS_AddEntity(scene);
+
+    skRenderAssociation* assoc2 = SK_ECS_ASSIGN(scene, ent2, skRenderAssociation);
+    assoc2->objectIndex = renderer.renderObjects->size;
+    skName* name2 = SK_ECS_ASSIGN(scene, ent2, skName);
+    strcpy(name2->name, "Ent");
 
     skRenderObject obj2 = skRenderObject_CreateFromModel(
         &renderer, &model, "res/room.png");
     glm_translate(obj2.transform, (vec3) {1.0f, 0.0f, 0.0f});
 
     skRenderer_AddRenderObject(&renderer, &obj2);
+    
+    skEntityID ent3 = skECS_AddEntity(scene);
+
+    skRenderAssociation* assoc3 = SK_ECS_ASSIGN(scene, ent3, skRenderAssociation);
+    assoc3->objectIndex = renderer.renderObjects->size;
+    skName* name3 = SK_ECS_ASSIGN(scene, ent3, skName);
+    strcpy(name3->name, "Ent");
 
     skRenderObject obj3 =
         skRenderObject_CreateFromSprite(&renderer, "res/textures/image.png");
@@ -40,14 +63,6 @@ int main(int argc, char** argv)
     float lastTime = glfwGetTime();
     float timeAccumulator = 0.0f;
     char  fpsString[16] = {0};
-
-    skSceneHandle scene = skECS_CreateScene();
-
-    skEntityID ent = skECS_AddEntity(scene);
-
-    SK_ECS_ASSIGN(scene, ent, skTransform);
-    skName* name = SK_ECS_ASSIGN(scene, ent, skName);
-    strcpy(name->name, "Ent");
 
     skCamera camera = skCamera_Create((vec3) {0.0f, 3.0f, 0.0f},
                                       (vec3) {0.0f, 0.0f, 1.0f},

@@ -201,7 +201,6 @@ void* skECS_GetComponent(skSceneHandle scene, skEntityID entity,
     Scene*      pScene = &scene->cppScene;
     EntityIndex entityIndex = GetEntityIndex(entity);
 
-#ifdef SK_DEBUG_LEVEL_2
     // Check if the entity has this component
     if (entityIndex >= pScene->entities.size() ||
         !pScene->entities[entityIndex].mask.test(internalId) ||
@@ -210,7 +209,6 @@ void* skECS_GetComponent(skSceneHandle scene, skEntityID entity,
     {
         return NULL;
     }
-#endif
 
     return pScene->componentPools[internalId]->get(entityIndex);
 }

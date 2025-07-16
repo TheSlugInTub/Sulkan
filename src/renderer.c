@@ -5,6 +5,7 @@
 #include <stb/stb_image.h>
 #include <sulkan/imgui_layer.h>
 #include <sulkan/editor.h>
+#include <sulkan/basic_components.h>
 
 static const Bool enableValidationLayers = true;
 
@@ -861,8 +862,7 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
 
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
-                                    u32             imageIndex,
-                                    skEditor* editor)
+                                    u32 imageIndex, skEditor* editor)
 {
     VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -938,13 +938,16 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
     }
 
-    skImGui_NewFrame();
+    if (editor != NULL)
+    {
+        skImGui_NewFrame();
 
-    skEditor_DrawHierarchy(editor);
-    skEditor_DrawInspector(editor);
-    skEditor_DrawTray(editor);
+        skEditor_DrawHierarchy(editor);
+        skEditor_DrawInspector(editor);
+        skEditor_DrawTray(editor);
 
-    skImGui_EndFrame(commandBuffer);
+        skImGui_EndFrame(commandBuffer);
+    }
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1227,7 +1230,8 @@ void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
 
     skRenderer_UpdateUniformBuffers(renderer);
 
-    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex, editor);
+    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex,
+                                   editor);
 
     vkResetFences(renderer->device, 1, inFlightFence);
 
@@ -2261,7 +2265,7 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     {
         printf("SK ERROR: Failed to create texture sampler.");
     }
-
+    
     glm_mat4_identity(obj.transform);
 
     return obj;
