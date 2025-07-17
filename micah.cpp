@@ -551,7 +551,9 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         << "    for (int i = 0; i < "
            "skECS_EntityCount(state->scene); i++)\n    {\n      "
            "  skEntityID ent = skECS_GetEntityAtIndex(state->scene, "
-           "i);\n        skJson entJson = skJson_Create();\n\n";
+           "i);\n        skJson entJson = skJson_Create();\n\n       "
+           " if (!skECS_IsEntityValid(ent))\n        {\n          "
+           "  continue;\n        }\n\n";
 
     for (int i = 0; i < structures.size(); i++)
     {
@@ -572,16 +574,17 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         sourceFile << "            skJson compJson = "
                    << structure.identifier << "_SaveComponent("
                    << objIdent << ");\n";
-        sourceFile
-            << "            skJson_SaveString(compJson, \"type\", \""
-            << structure.identifier << "\");\n";
+        sourceFile << "            skJson_SaveString(compJson, "
+                      "\"componentType\", \""
+                   << structure.identifier << "\");\n";
         sourceFile
             << "            skJson_PushBack(entJson, compJson);\n";
         sourceFile << "            skJson_Destroy(compJson);\n";
         sourceFile << "        }\n\n";
     }
 
-    sourceFile << "        skJson_PushBack(j, entJson);\n        skJson_Destroy(entJson);\n    }\n\n   "
+    sourceFile << "        skJson_PushBack(j, entJson);\n        "
+                  "skJson_Destroy(entJson);\n    }\n\n   "
                   " return j;\n}\n";
 
     sourceFile << "\n";
@@ -604,7 +607,8 @@ void CreateSource(std::vector<Structure>& structures, char** args,
     sourceFile << "            skJson compJson = "
                   "skJson_GetArrayElement(entJson, compIndex);\n\n";
     sourceFile << "            char componentType[256];\n";
-    sourceFile << "            skJson_LoadString(compJson, \"type\", "
+    sourceFile << "            skJson_LoadString(compJson, "
+                  "\"componentType\", "
                   "componentType);\n\n";
     sourceFile << "            // Check component type and "
                   "assign/load accordingly\n";

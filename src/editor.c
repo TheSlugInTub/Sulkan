@@ -17,6 +17,7 @@ void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
 void skEditor_LoadScene(skECSState* state, skSceneHandle scene, const char* filepath)
 {
     skECS_ClearScene(scene);
+    skVector_Clear(state->renderer->renderObjects);
 
     skJson j = skJson_LoadFromFile(filepath);
 
@@ -41,7 +42,6 @@ void skEditor_DrawHierarchy(skEditor* editor)
 
     for (int i = 0; i < skECS_EntityCount(scene); i++)
     {
-
         skEntityID ent = skECS_GetEntityAtIndex(scene, i);
 
         if (!skECS_IsEntityValid(ent))
@@ -50,7 +50,7 @@ void skEditor_DrawHierarchy(skEditor* editor)
         skImGui_PushID((int)i);
 
         skName* name = SK_ECS_GET(scene, ent, skName);
-
+        
         bool selected = editor->selectedEntityIndex == (int)i;
         assert(name != NULL);
         if (skImGui_Selectable(name->name, selected))
@@ -124,7 +124,7 @@ void skEditor_DrawHierarchy(skEditor* editor)
 
 void skEditor_DrawInspector(skEditor* editor)
 {
-    if (editor->selectedEntityIndex == -1)
+    if (!skECS_IsEntityValid(editor->selectedEntity))
         return;
 
     skSceneHandle scene = editor->ecsState->scene;
@@ -147,14 +147,18 @@ void skEditor_DrawTray(skEditor* editor)
 {
     skImGui_Begin("Tray");
 
+    skImGui_InputText("Scene Name", editor->sceneName, 128, 0);
+
     if (skImGui_Button("Save"))
     {
-        skEditor_SaveScene(editor->ecsState, editor->ecsState->scene, "scene.json");
+        skEditor_SaveScene(editor->ecsState, editor->ecsState->scene,
+                editor->sceneName);
     }
     
     if (skImGui_Button("Load"))
     {
-        skEditor_LoadScene(editor->ecsState, editor->ecsState->scene, "scene.json");
+        skEditor_LoadScene(editor->ecsState, editor->ecsState->scene, 
+                editor->sceneName);
     }
 
     skImGui_End();

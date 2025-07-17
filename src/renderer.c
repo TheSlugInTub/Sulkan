@@ -438,9 +438,9 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
 {
     u32   vertLen, fragLen;
     char* vertShaderCode =
-        skReadFile("D:/Repos/Sulkan/vert.spv", &vertLen);
+        skReadFile("shaders/vert.spv", &vertLen);
     char* fragShaderCode =
-        skReadFile("D:/Repos/Sulkan/frag.spv", &fragLen);
+        skReadFile("shaders/frag.spv", &fragLen);
 
     VkShaderModule vertMod =
         skCreateShaderModule(renderer, vertShaderCode, vertLen);
@@ -1853,6 +1853,9 @@ skRenderer skRenderer_Create(skWindow* window)
 
     renderer.currentFrame = 0;
     renderer.window = window;
+    
+    renderer.renderObjects =
+        skVector_Create(sizeof(skRenderObject), 10);
 
     skRenderer_CreateInstance(rendererPtr);
     skRenderer_CreateSurface(rendererPtr, window);
@@ -1872,37 +1875,6 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateSyncObjects(&renderer);
 
     return renderer;
-}
-
-void skRenderer_InitializeVulkan(skRenderer* renderer,
-                                 skWindow*   window)
-{
-    renderer->currentFrame = 0;
-    renderer->window = window;
-
-    renderer->renderObjects =
-        skVector_Create(sizeof(skRenderObject), 10);
-
-    skRenderer_CreateInstance(renderer);
-    skRenderer_CreateSurface(renderer, window);
-    skRenderer_CreateDebugMessenger(renderer);
-    skRenderer_CreatePhysicalDevice(renderer);
-    skRenderer_CreateLogicalDevice(renderer);
-    skRenderer_CreateSwapchain(renderer, window);
-    skRenderer_CreateImageViews(renderer);
-    skRenderer_CreateRenderPass(renderer);
-    skRenderer_CreateDescriptorSetLayout(renderer);
-    skRenderer_CreateGraphicsPipeline(renderer);
-    skRenderer_CreateCommandPool(renderer);
-    skRenderer_CreateDepthResources(renderer);
-    skRenderer_CreateFramebuffers(renderer);
-    skRenderer_CreateDescriptorPool(renderer);
-}
-
-void skRenderer_InitializeUniformsAndDescriptors(skRenderer* renderer)
-{
-    skRenderer_CreateCommandBuffers(renderer);
-    skRenderer_CreateSyncObjects(renderer);
 }
 
 void skRenderer_InitImGui(skRenderer* renderer)
@@ -2019,6 +1991,8 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
     if (!pixels)
     {
         printf("SK ERROR: Failed to load texture image.");
+        pixels = stbi_load("res/textures/image.png", &texWidth, &texHeight,
+                           &texChannels, STBI_rgb_alpha);
     }
 
     VkBuffer       imageStagingBuffer;
@@ -2265,7 +2239,7 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     {
         printf("SK ERROR: Failed to create texture sampler.");
     }
-    
+
     glm_mat4_identity(obj.transform);
 
     return obj;

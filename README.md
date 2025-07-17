@@ -2,8 +2,6 @@
 
 Sulkan is a Vulkan game engine in C.
 
-
-
 # Building
 
 ```bash
@@ -24,3 +22,4 @@ You will need to have git and cmake to compile the project.
 [cglm](https://github.com/recp/cglm) - For math and linear algebra. \
 [stb_image](https://github.com/nothings/stb) - For loading images. \
 [LunarG Vulkan SDK](https://github.com/LunarG/VulkanTools/releases/tag/sdk-1.0.33.0) - For graphics rendering.
+[ImGui](https://github.com/ocornut/imgui) - For graphics rendering.

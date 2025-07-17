@@ -305,7 +305,7 @@ bool skImGui_InputHex(const char* name, unsigned int* val)
 bool skImGui_ComboBox(const char* name, const char** types,
                       int* currentType, int typeSize)
 {
-    return ImGui::Combo("Body Type", currentType, types, 3);
+    return ImGui::Combo(name, currentType, types, typeSize);
 }
 
 bool skImGui_Checkbox(const char* name, bool* val)

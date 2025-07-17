@@ -1,6 +1,37 @@
 #include <sulkan/render_association.h>
 #include <sulkan/state.h>
 
+void skRenderAssociation_CreateRenderObject(
+    skRenderAssociation* assoc, skECSState* state)
+{
+    skRenderObject obj;
+
+    if (assoc->type == skRenderObjectType_Model)
+    {
+        skModel model = skModel_Create();
+        skModel_Load(&model, assoc->modelPath);
+
+        obj = skRenderObject_CreateFromModel(state->renderer, &model,
+                                             assoc->texturePath);
+    }
+    else if (assoc->type == skRenderObjectType_Sprite)
+    {
+        obj = skRenderObject_CreateFromSprite(state->renderer,
+                                              assoc->texturePath);
+    }
+
+    mat4 trans = GLM_MAT4_IDENTITY_INIT;
+    glm_translate(trans, assoc->position);
+    glm_quat_rotate(trans, assoc->rotation, trans);
+    glm_scale(trans, assoc->scale);
+
+    glm_mat4_copy(trans, obj.transform);
+
+    assoc->objectIndex = state->renderer->renderObjects->size;
+    
+    skRenderer_AddRenderObject(state->renderer, &obj);
+}
+
 void skRenderAssociation_StartSys(skECSState* state)
 {
     SK_ECS_ITER_START(state->scene,
@@ -9,14 +40,7 @@ void skRenderAssociation_StartSys(skECSState* state)
         skRenderAssociation* assoc =
             SK_ECS_GET(state->scene, _entity, skRenderAssociation);
 
-        mat4 trans = GLM_MAT4_IDENTITY_INIT;
-        glm_translate(trans, assoc->position);
-        glm_quat_rotate(trans, assoc->rotation, trans);
-        glm_scale(trans, assoc->scale);
-
-        skRenderObject* obj = (skRenderObject*)skVector_Get(
-            state->renderer->renderObjects, assoc->objectIndex);
-        glm_mat4_copy(trans, obj->transform);
+        skRenderAssociation_CreateRenderObject(assoc, state);
     }
     SK_ECS_ITER_END();
 }

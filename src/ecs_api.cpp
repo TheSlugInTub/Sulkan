@@ -182,20 +182,15 @@ void* skECS_AssignComponent(skSceneHandle scene, skEntityID entity,
 void* skECS_GetComponent(skSceneHandle scene, skEntityID entity,
                          skComponentTypeID componentTypeId)
 {
-
-#ifdef SK_DEBUG_LEVEL_1
     if (!scene || !IsEntityValid(entity))
         return NULL;
-#endif
     
     auto it = scene->componentTypeMap.find(componentTypeId);
 
-#ifdef SK_DEBUG_LEVEL_1
     if (it == scene->componentTypeMap.end())
     {
         return NULL; // Component type not registered
     }
-#endif
 
     int         internalId = it->second;
     Scene*      pScene = &scene->cppScene;

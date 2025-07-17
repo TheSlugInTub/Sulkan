@@ -88,6 +88,7 @@ void skModel_Load(skModel* model, const char* path)
         !scene->mRootNode)
     {
         fprintf(stderr, "ERROR::ASSIMP:: %s\n", aiGetErrorString());
+        skModel_Load(model, "res/models/box.fbx");
         return;
     }
 

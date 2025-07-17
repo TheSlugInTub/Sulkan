@@ -1,13 +1,15 @@
 [
     [
         {
-            "name": "Ent",
-            "type": "skName"
+            "componentType": "skName",
+            "name": "Ent"
         },
         {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/room.fbx",
             "objectIndex": 0,
             "position": [
-                1.100000023841858,
+                -1.100000023841858,
                 0.0,
                 0.0
             ],
@@ -22,18 +24,21 @@
                 1.0,
                 1.0
             ],
-            "type": "skRenderAssociation"
+            "texturePath": "res/textures/room.png",
+            "type": 0
         }
     ],
     [
         {
-            "name": "Ent",
-            "type": "skName"
+            "componentType": "skName",
+            "name": "Ent"
         },
         {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/room.fbx",
             "objectIndex": 1,
             "position": [
-                -0.800000011920929,
+                0.699999988079071,
                 0.0,
                 0.0
             ],
@@ -48,19 +53,22 @@
                 1.0,
                 1.0
             ],
-            "type": "skRenderAssociation"
+            "texturePath": "res/textures/room.png",
+            "type": 0
         }
     ],
     [
         {
-            "name": "Ent",
-            "type": "skName"
+            "componentType": "skName",
+            "name": "Ent"
         },
         {
+            "componentType": "skRenderAssociation",
+            "modelPath": "",
             "objectIndex": 2,
             "position": [
                 0.0,
-                1.2999999523162842,
+                1.2000000476837158,
                 0.0
             ],
             "rotation": [
@@ -74,7 +82,8 @@
                 1.0,
                 1.0
             ],
-            "type": "skRenderAssociation"
+            "texturePath": "res/textures/image.png",
+            "type": 1
         }
     ]
 ]
