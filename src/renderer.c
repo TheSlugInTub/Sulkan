@@ -928,11 +928,14 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         vkCmdBindIndexBuffer(commandBuffer, obj->indexBuffer, 0,
                              VK_INDEX_TYPE_UINT32);
 
+        VkDescriptorSet sets[] = {obj->descriptorSets[renderer->currentFrame], 
+                            renderer->descriptorSets[renderer->currentFrame]};
+
         // Bind descriptor set for this object
         vkCmdBindDescriptorSets(
             commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            renderer->pipelineLayout, 0, 1,
-            &obj->descriptorSets[renderer->currentFrame], 0, NULL);
+            renderer->pipelineLayout, 0, 2,
+            sets, 0, NULL);
 
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
@@ -1203,6 +1206,14 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         // Update this object's uniform buffer
         memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(ubo));
+    }
+  
+    skLight* mapped = (skLight*)renderer->uniformBuffersMap[renderer->currentFrame];
+    
+    for (size_t i = 0; i < renderer->lights->size; i++)
+    {
+        skLight* light = (skLight*)skVector_Get(renderer->lights, i);
+        mapped[i] = *light;
     }
 }
 
@@ -1628,13 +1639,21 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     samplerLayoutBinding.pImmutableSamplers = NULL;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    VkDescriptorSetLayoutBinding lightBufferBinding = {0};
+    lightBufferBinding.binding = 2;
+    lightBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    lightBufferBinding.descriptorCount = 1;
+    lightBufferBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightBufferBinding.pImmutableSamplers = NULL;
+
     VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
-                                               samplerLayoutBinding};
+                                               samplerLayoutBinding,
+                                               lightBufferBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(
@@ -1642,6 +1661,67 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
             &renderer->descriptorSetLayout) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create descriptor set layout.\n");
+    }
+}
+
+void skRenderer_CreateDescriptorSets(skRenderer* renderer)
+{
+    VkDeviceSize bufferSize = sizeof(skLight) * SK_MAX_LIGHTS;
+    
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        skRenderer_CreateBuffer(
+            renderer, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &renderer->uniformBuffers[frame],
+            &renderer->uniformBuffersMemory[frame]);
+
+        vkMapMemory(renderer->device,
+                    renderer->uniformBuffersMemory[frame], 0,
+                    bufferSize, 0, &renderer->uniformBuffersMap[frame]);
+    }
+
+    VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        layouts[i] = renderer->descriptorSetLayout;
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = renderer->descriptorPool;
+    allocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
+    allocInfo.pSetLayouts = layouts;
+
+    if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
+                                 renderer->descriptorSets) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate descriptor sets for "
+               "light.");
+    }
+
+    // Update descriptor sets
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        VkDescriptorBufferInfo bufferInfo = {0};
+        bufferInfo.buffer = renderer->uniformBuffers[frame];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(skLight) * SK_MAX_LIGHTS;
+
+        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}};
+        descriptorWrites[0].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = renderer->descriptorSets[frame];
+        descriptorWrites[0].dstBinding = 2;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
+                               0, NULL);
     }
 }
 
@@ -1669,9 +1749,15 @@ void skRenderer_AddRenderObject(skRenderer*     renderer,
     skVector_PushBack(renderer->renderObjects, object);
 }
 
+void skRenderer_AddLight(skRenderer*     renderer,
+                                skLight* light)
+{
+    skVector_PushBack(renderer->lights, light);
+}
+
 void skRenderer_CreateDescriptorPool(skRenderer* renderer)
 {
-    VkDescriptorPoolSize poolSizes[] = {{0}, {0}};
+    VkDescriptorPoolSize poolSizes[] = {{0}, {0}, {0}};
 
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount =
@@ -1680,12 +1766,15 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
     poolSizes[1].descriptorCount =
         (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT) +
         SK_FRAMES_IN_FLIGHT;
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount =
+        SK_MAX_LIGHTS * SK_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.flags =
         VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.poolSizeCount = 2;
+    poolInfo.poolSizeCount = 3;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = (SK_FRAMES_IN_FLIGHT * SK_MAX_RENDER_OBJECTS) +
                        SK_FRAMES_IN_FLIGHT;
@@ -1856,6 +1945,8 @@ skRenderer skRenderer_Create(skWindow* window)
     
     renderer.renderObjects =
         skVector_Create(sizeof(skRenderObject), 10);
+    renderer.lights =
+        skVector_Create(sizeof(skLight), 10);
 
     skRenderer_CreateInstance(rendererPtr);
     skRenderer_CreateSurface(rendererPtr, window);
@@ -1871,6 +1962,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateDepthResources(&renderer);
     skRenderer_CreateFramebuffers(&renderer);
     skRenderer_CreateDescriptorPool(&renderer);
+    skRenderer_CreateDescriptorSets(&renderer);
     skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
 

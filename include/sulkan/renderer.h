@@ -31,6 +31,16 @@ typedef struct skQueueFamilyIndices
     Bool isValid;
 } skQueueFamilyIndices;
 
+#define SK_MAX_LIGHTS 10
+
+typedef struct skLight
+{
+    vec3  position;
+    vec3  color;
+    float radius;
+    float intensity;
+} skLight;
+
 typedef struct skUniformBufferObject
 {
     mat4 model;
@@ -63,13 +73,21 @@ typedef struct skRenderer
     skVector*                inFlightFences;           // VkFence
     u32                      currentFrame;
     VkDescriptorSetLayout    descriptorSetLayout;
+    VkDescriptorSetLayout    lightDescriptorSetLayout;
     VkDescriptorPool         descriptorPool;
     VkImage                  depthImage;
     VkImageView              depthImageView;
     VkDeviceMemory           depthImageMemory;
     mat4                     viewTransform;
     skVector*                renderObjects; // skRenderObject
-    VkInstance               instance;
+    skVector*                lights;        // skLight
+
+    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
+
+    VkInstance instance;
 } skRenderer;
 
 struct skRenderObject;
@@ -88,7 +106,7 @@ void skRenderer_CreateBuffer(skRenderer* renderer, size_t size,
                              VkDeviceMemory*       bufferMemory);
 
 VkVertexInputBindingDescription skVertex_GetBindingDescription(void);
-char*               skReadFile(const char* filePath, u32* len);
+char* skReadFile(const char* filePath, u32* len);
 
 VkShaderModule      skCreateShaderModule(skRenderer* renderer,
                                          char* buffer, u32 len);
@@ -112,12 +130,12 @@ void skPopulateDebugMessengerCreateInfo(
 VkSurfaceFormatKHR
 skChooseSwapSurfaceFormat(skVector* availableFormats);
 VkPresentModeKHR
-           skChooseSwapPresentMode(skVector* availablePresentModes);
+skChooseSwapPresentMode(skVector* availablePresentModes);
 
 u32        skClampU32(u32 val, u32 low, u32 high);
 VkExtent2D skChooseSwapExtent(VkSurfaceCapabilitiesKHR* capabilities,
                               skWindow*                 window);
-skSwapchainDetails   skQuerySwapchainSupport(skRenderer* renderer);
+skSwapchainDetails skQuerySwapchainSupport(skRenderer* renderer);
 
 skQueueFamilyIndices skFindQueueFamilies(VkPhysicalDevice device,
                                          VkSurfaceKHR     surface);
@@ -140,21 +158,21 @@ void skRenderer_CleanSwapchain(skRenderer* renderer);
 u32  skRenderer_FindMemoryType(skRenderer* renderer, u32 typeFilter,
                                VkMemoryPropertyFlags properties);
 
-void skRenderer_CreateImage(skRenderer* renderer, u32 width,
-                            u32 height, VkFormat format,
-                            VkImageTiling         tiling,
-                            VkImageUsageFlags     usage,
-                            VkMemoryPropertyFlags properties,
-                            VkImage*              image,
-                            VkDeviceMemory*       imageMemory);
+void        skRenderer_CreateImage(skRenderer* renderer, u32 width,
+                                   u32 height, VkFormat format,
+                                   VkImageTiling         tiling,
+                                   VkImageUsageFlags     usage,
+                                   VkMemoryPropertyFlags properties,
+                                   VkImage*              image,
+                                   VkDeviceMemory*       imageMemory);
 VkImageView skRenderer_CreateImageView(skRenderer* renderer,
                                        VkImage image, VkFormat format,
                                        VkImageAspectFlags flags);
 
-void        skRenderer_CreateDepthResources(skRenderer* renderer);
-void        skRenderer_RecreateSwapchain(skRenderer* renderer,
-                                         skWindow*   window);
-void        skRenderer_UpdateUniformBuffers(skRenderer* renderer);
+void skRenderer_CreateDepthResources(skRenderer* renderer);
+void skRenderer_RecreateSwapchain(skRenderer* renderer,
+                                  skWindow*   window);
+void skRenderer_UpdateUniformBuffers(skRenderer* renderer);
 VkCommandBuffer
      skRenderer_BeginSingleTimeCommands(skRenderer* renderer);
 void skRenderer_EndSingleTimeCommands(skRenderer*     renderer,
@@ -170,6 +188,7 @@ void skRenderer_TransitionImageLayout(skRenderer* renderer,
                                       VkImageLayout newLayout);
 Bool skHasStencilComponent(VkFormat format);
 void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer);
+void skRenderer_CreateDescriptorSets(skRenderer* renderer);
 void skRenderer_CreateDescriptorPool(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
 
@@ -204,3 +223,4 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
                                               skRenderObject* obj);
 void skRenderer_AddRenderObject(skRenderer*     renderer,
                                 skRenderObject* object);
+void skRenderer_AddLight(skRenderer* renderer, skLight* light);

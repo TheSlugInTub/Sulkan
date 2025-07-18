@@ -8,9 +8,17 @@ int main(int argc, char** argv)
 
     skRenderer renderer = skRenderer_Create(&window);
     
-    skSceneHandle scene = skECS_CreateScene();
-
     skRenderer_InitImGui(&renderer);
+    
+    skLight light = {0};
+    glm_vec3_copy((vec3) {0.0f, 0.0f, 2.0f}, light.position);
+    glm_vec3_copy((vec3) {1.0f, 1.0f, 1.0f}, light.color);
+    light.intensity = 2.0f;
+    light.radius = 10.0f;
+
+    skRenderer_AddLight(&renderer, &light);
+
+    skSceneHandle scene = skECS_CreateScene();
 
     float fps = 0.0f;
     int   frameCount = 0;
