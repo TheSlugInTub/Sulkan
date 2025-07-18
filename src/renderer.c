@@ -566,8 +566,10 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &renderer->descriptorSetLayout;
+    pipelineLayoutInfo.setLayoutCount = 2;
+    VkDescriptorSetLayout layouts[] = { renderer->descriptorSetLayout, 
+                                        renderer->lightDescriptorSetLayout };
+    pipelineLayoutInfo.pSetLayouts = layouts;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = NULL;
 
@@ -1639,21 +1641,13 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     samplerLayoutBinding.pImmutableSamplers = NULL;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding lightBufferBinding = {0};
-    lightBufferBinding.binding = 2;
-    lightBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    lightBufferBinding.descriptorCount = 1;
-    lightBufferBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    lightBufferBinding.pImmutableSamplers = NULL;
-
     VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
-                                               samplerLayoutBinding,
-                                               lightBufferBinding};
+                                               samplerLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 2;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(
@@ -1661,6 +1655,26 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
             &renderer->descriptorSetLayout) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create descriptor set layout.\n");
+    }
+    
+    VkDescriptorSetLayoutBinding lightBufferBinding = {0};
+    lightBufferBinding.binding = 0;
+    lightBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    lightBufferBinding.descriptorCount = 1;
+    lightBufferBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightBufferBinding.pImmutableSamplers = NULL;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo2 = {0};
+    layoutInfo2.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo2.bindingCount = 1;
+    layoutInfo2.pBindings = &lightBufferBinding;
+
+    if (vkCreateDescriptorSetLayout(
+            renderer->device, &layoutInfo2, NULL,
+            &renderer->lightDescriptorSetLayout) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create descriptor set layout for lights.\n");
     }
 }
 
@@ -1685,7 +1699,7 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
     VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
     for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
     {
-        layouts[i] = renderer->descriptorSetLayout;
+        layouts[i] = renderer->lightDescriptorSetLayout;
     }
 
     VkDescriptorSetAllocateInfo allocInfo = {0};
@@ -1709,11 +1723,11 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(skLight) * SK_MAX_LIGHTS;
 
-        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}};
+        VkWriteDescriptorSet descriptorWrites[] = {{0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = renderer->descriptorSets[frame];
-        descriptorWrites[0].dstBinding = 2;
+        descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType =
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
