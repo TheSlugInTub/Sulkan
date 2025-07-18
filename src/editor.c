@@ -161,5 +161,20 @@ void skEditor_DrawTray(skEditor* editor)
                 editor->sceneName);
     }
 
+    if (!editor->playing)
+    {
+        if (skImGui_Button("Play"))
+        {
+            editor->playing = true;
+        }
+    }
+    else
+    {
+        if (skImGui_Button("Stop"))
+        {
+            editor->playing = false;
+        }
+    }
+
     skImGui_End();
 }

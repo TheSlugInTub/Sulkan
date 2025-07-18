@@ -31,6 +31,7 @@ void skName_LoadComponent(skName* object, skJson j)
     skJson_LoadString(j, "name", object->name);
 }
 
+// IGNORE
 void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* state)
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
@@ -120,18 +121,19 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* 
                 skRenderer_CreateDescriptorSetsForObject(state->renderer, obj);
             }
         }
+            
+        skRenderObject* obj = skVector_Get(state->renderer->renderObjects,
+                    object->objectIndex);
 
-        if (skImGui_DragFloat3("position", object->position, 0.1f) || 
+        if ((skImGui_DragFloat3("position", object->position, 0.1f) || 
             skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
-            skImGui_DragFloat3("scale", object->scale, 0.1f))
+            skImGui_DragFloat3("scale", object->scale, 0.1f)) && obj != NULL)
         {
             mat4 trans = GLM_MAT4_IDENTITY_INIT;
             glm_translate(trans, object->position);
             glm_quat_rotate(trans, object->rotation, trans);
             glm_scale(trans, object->scale);
             
-            skRenderObject* obj = skVector_Get(state->renderer->renderObjects,
-                    object->objectIndex);
             glm_mat4_copy(trans, obj->transform);
         }
     }
@@ -165,7 +167,7 @@ void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
 void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
 {
     skName* skNameObj = SK_ECS_GET(state->scene, ent, skName);
-    
+
     if (skNameObj != NULL)
     {
         skName_DrawComponent(skNameObj, state);

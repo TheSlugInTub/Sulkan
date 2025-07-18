@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <cctype>
+#include <unordered_map>
 
 enum Type
 {
@@ -297,9 +298,87 @@ void ParseFile(const char*             filePath,
     }
 }
 
+std::unordered_map<std::string, std::string>
+ExtractIgnoredFunctions(const std::string& filename)
+{
+    std::unordered_map<std::string, std::string> ignoredFuncMap;
+    std::ifstream                                inFile(filename);
+    if (!inFile)
+        return ignoredFuncMap;
+
+    std::vector<std::string> lines;
+    std::string              line;
+    while (std::getline(inFile, line)) {
+        lines.push_back(line);
+    }
+
+    for (int i = 0; i < lines.size(); i++)
+    {
+        if (lines[i].find("// IGNORE") != std::string::npos)
+        {
+            // Find the function signature (next non-empty line)
+            int sigLine = i + 1;
+            while (sigLine < lines.size() && lines[sigLine].empty())
+                sigLine++;
+            if (sigLine >= lines.size())
+                continue;
+
+            // Count braces to capture the entire function
+            int braceCount = 0;
+            int currentLine = sigLine;
+            bool foundOpeningBrace = false;
+
+            // Check all lines starting from the signature line
+            while (currentLine < lines.size())
+            {
+                const std::string& currentText = lines[currentLine];
+                for (char c : currentText)
+                {
+                    if (c == '{') {
+                        braceCount++;
+                        foundOpeningBrace = true;
+                    } else if (c == '}') {
+                        braceCount--;
+                    }
+                }
+
+                if (foundOpeningBrace && braceCount == 0)
+                    break;
+
+                currentLine++;
+            }
+
+            if (braceCount != 0 || currentLine >= lines.size())
+                continue;
+
+            // Extract function name from signature line
+            std::string sig = lines[sigLine];
+            size_t pos = sig.find('(');
+            if (pos == std::string::npos)
+                continue;
+            size_t nameStart = sig.substr(0, pos).find_last_of(" *&");
+            nameStart = (nameStart == std::string::npos) ? 0 : nameStart + 1;
+            std::string funcName = sig.substr(nameStart, pos - nameStart);
+
+            // Store the entire function (from comment to last brace)
+            std::string funcText;
+            for (int j = i; j <= currentLine; j++)
+            {
+                funcText += lines[j] + "\n";
+            }
+
+            ignoredFuncMap[funcName] = funcText;
+            i = currentLine; // Skip processed lines
+        }
+    }
+
+    return ignoredFuncMap;
+}
+
 void CreateSource(std::vector<Structure>& structures, char** args,
                   int argLength)
 {
+    auto          ignoredFuncMap = ExtractIgnoredFunctions("micah.h");
     std::ofstream sourceFile("micah.h");
 
     sourceFile << "#pragma once\n\n";
@@ -330,189 +409,224 @@ void CreateSource(std::vector<Structure>& structures, char** args,
 
         sourceFile << '\n';
 
-        sourceFile << "void " << structure.identifier
-                   << "_DrawComponent(" << structure.identifier
-                   << "* object, skECSState* state)\n{\n";
-
-        sourceFile << "    if (skImGui_CollapsingHeader(\""
-                   << structure.identifier << "\"))\n    {\n";
-
-        for (Variable& var : structure.variables)
+        std::string drawFuncName =
+            structure.identifier + "_DrawComponent";
+        auto drawIt = ignoredFuncMap.find(drawFuncName);
+        if (drawIt != ignoredFuncMap.end())
         {
-            if (var.typeString == "int")
-            {
-                sourceFile << "        " << "skImGui_InputInt(\""
-                           << var.identifier << "\", &object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "char" && var.isArray)
-            {
-                sourceFile << "        " << "skImGui_InputText(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", "
-                           << var.arrayLength << ", 0);\n";
-            }
-            if (var.typeString == "mat4")
-            {
-                sourceFile << "        " << "skImGui_DragFloat16(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
-            if (var.typeString == "quat")
-            {
-                sourceFile << "        " << "skImGui_DragFloat4(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
-            if (var.typeString == "vec4")
-            {
-                sourceFile << "        " << "skImGui_DragFloat4(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
-            if (var.typeString == "vec3")
-            {
-                sourceFile << "        " << "skImGui_DragFloat3(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
-            if (var.typeString == "vec2")
-            {
-                sourceFile << "        " << "skImGui_DragFloat2(\""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
-            if (var.typeString == "float")
-            {
-                sourceFile << "        " << "skImGui_DragFloat(\""
-                           << var.identifier << "\", &object->"
-                           << var.identifier << ", 0.1f);\n";
-            }
+            sourceFile << drawIt->second << "\n";
         }
+        else
+        {
+            sourceFile << "void " << structure.identifier
+                       << "_DrawComponent(" << structure.identifier
+                       << "* object, skECSState* state)\n{\n";
 
-        sourceFile << "    }\n}\n\n";
+            sourceFile << "    if (skImGui_CollapsingHeader(\""
+                       << structure.identifier << "\"))\n    {\n";
+
+            for (Variable& var : structure.variables)
+            {
+                if (var.typeString == "int")
+                {
+                    sourceFile << "        " << "skImGui_InputInt(\""
+                               << var.identifier << "\", &object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "char" && var.isArray)
+                {
+                    sourceFile << "        " << "skImGui_InputText(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", "
+                               << var.arrayLength << ", 0);\n";
+                }
+                if (var.typeString == "mat4")
+                {
+                    sourceFile << "        "
+                               << "skImGui_DragFloat16(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+                if (var.typeString == "quat")
+                {
+                    sourceFile << "        "
+                               << "skImGui_DragFloat4(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+                if (var.typeString == "vec4")
+                {
+                    sourceFile << "        "
+                               << "skImGui_DragFloat4(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+                if (var.typeString == "vec3")
+                {
+                    sourceFile << "        "
+                               << "skImGui_DragFloat3(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+                if (var.typeString == "vec2")
+                {
+                    sourceFile << "        "
+                               << "skImGui_DragFloat2(\""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+                if (var.typeString == "float")
+                {
+                    sourceFile << "        " << "skImGui_DragFloat(\""
+                               << var.identifier << "\", &object->"
+                               << var.identifier << ", 0.1f);\n";
+                }
+            }
+
+            sourceFile << "    }\n}\n\n";
+        }
 
         // SERIALIZATION FUNCTIONS
 
-        sourceFile << "skJson " << structure.identifier
-                   << "_SaveComponent(" << structure.identifier
-                   << "* object)\n{\n";
-
-        sourceFile << "    skJson j = skJson_Create();\n\n";
-
-        for (Variable& var : structure.variables)
+        std::string saveFuncName =
+            structure.identifier + "_SaveComponent";
+        auto saveIt = ignoredFuncMap.find(saveFuncName);
+        if (saveIt != ignoredFuncMap.end())
         {
-            if (var.typeString == "int")
-            {
-                sourceFile << "    " << "skJson_SaveInt(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "char" && var.isArray)
-            {
-                sourceFile << "    " << "skJson_SaveString(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "mat4")
-            {
-                sourceFile << "    " << "skJson_SaveFloat16(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "quat")
-            {
-                sourceFile << "    " << "skJson_SaveFloat4(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec4")
-            {
-                sourceFile << "    " << "skJson_SaveFloat4(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec3")
-            {
-                sourceFile << "    " << "skJson_SaveFloat3(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec2")
-            {
-                sourceFile << "    " << "skJson_SaveFloat2(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "float")
-            {
-                sourceFile << "    " << "skJson_SaveFloat(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
+            sourceFile << saveIt->second << "\n";
         }
+        else
+        {
+            sourceFile << "skJson " << structure.identifier
+                       << "_SaveComponent(" << structure.identifier
+                       << "* object)\n{\n";
 
-        sourceFile << "    return j;\n}\n\n";
+            sourceFile << "    skJson j = skJson_Create();\n\n";
+
+            for (Variable& var : structure.variables)
+            {
+                if (var.typeString == "int")
+                {
+                    sourceFile << "    " << "skJson_SaveInt(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "char" && var.isArray)
+                {
+                    sourceFile << "    " << "skJson_SaveString(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "mat4")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat16(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "quat")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat4(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec4")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat4(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec3")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat3(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec2")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat2(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "float")
+                {
+                    sourceFile << "    " << "skJson_SaveFloat(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+            }
+
+            sourceFile << "    return j;\n}\n\n";
+        }
 
         // DESERIALIZATION FUNCTIONS
 
-        sourceFile << "void " << structure.identifier
-                   << "_LoadComponent(" << structure.identifier
-                   << "* object, skJson j)\n{\n";
-
-        for (Variable& var : structure.variables)
+        std::string loadFuncName =
+            structure.identifier + "_LoadComponent";
+        auto loadIt = ignoredFuncMap.find(loadFuncName);
+        if (loadIt != ignoredFuncMap.end())
         {
-            if (var.typeString == "int")
-            {
-                sourceFile << "    " << "skJson_LoadInt(j, \""
-                           << var.identifier << "\", &object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "char" && var.isArray)
-            {
-                sourceFile << "    " << "skJson_LoadString(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "mat4")
-            {
-                sourceFile << "    " << "skJson_LoadFloat16(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "quat")
-            {
-                sourceFile << "    " << "skJson_LoadFloat4(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec4")
-            {
-                sourceFile << "    " << "skJson_LoadFloat4(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec3")
-            {
-                sourceFile << "    " << "skJson_LoadFloat3(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "vec2")
-            {
-                sourceFile << "    " << "skJson_LoadFloat2(j, \""
-                           << var.identifier << "\", object->"
-                           << var.identifier << ");\n";
-            }
-            if (var.typeString == "float")
-            {
-                sourceFile << "    " << "skJson_LoadFloat(j, \""
-                           << var.identifier << "\", &object->"
-                           << var.identifier << ");\n";
-            }
+            sourceFile << loadIt->second << "\n";
         }
+        else
+        {
+            sourceFile << "void " << structure.identifier
+                       << "_LoadComponent(" << structure.identifier
+                       << "* object, skJson j)\n{\n";
 
-        sourceFile << "}\n";
+            for (Variable& var : structure.variables)
+            {
+                if (var.typeString == "int")
+                {
+                    sourceFile << "    " << "skJson_LoadInt(j, \""
+                               << var.identifier << "\", &object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "char" && var.isArray)
+                {
+                    sourceFile << "    " << "skJson_LoadString(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "mat4")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat16(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "quat")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat4(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec4")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat4(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec3")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat3(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "vec2")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat2(j, \""
+                               << var.identifier << "\", object->"
+                               << var.identifier << ");\n";
+                }
+                if (var.typeString == "float")
+                {
+                    sourceFile << "    " << "skJson_LoadFloat(j, \""
+                               << var.identifier << "\", &object->"
+                               << var.identifier << ");\n";
+                }
+            }
+
+            sourceFile << "}\n";
+        }
     }
 
     sourceFile << "\n";
@@ -543,16 +657,19 @@ void CreateSource(std::vector<Structure>& structures, char** args,
 
     sourceFile << "}\n\n";
 
-    sourceFile
-        << "skJson Micah_SaveAllComponents(skECSState* state)\n{\n";
+    sourceFile << "skJson Micah_SaveAllComponents(skECSState* "
+                  "state)\n{\n";
 
     sourceFile << "    skJson j = skJson_Create();\n\n";
     sourceFile
         << "    for (int i = 0; i < "
            "skECS_EntityCount(state->scene); i++)\n    {\n      "
-           "  skEntityID ent = skECS_GetEntityAtIndex(state->scene, "
-           "i);\n        skJson entJson = skJson_Create();\n\n       "
-           " if (!skECS_IsEntityValid(ent))\n        {\n          "
+           "  skEntityID ent = "
+           "skECS_GetEntityAtIndex(state->scene, "
+           "i);\n        skJson entJson = skJson_Create();\n\n   "
+           "    "
+           " if (!skECS_IsEntityValid(ent))\n        {\n         "
+           " "
            "  continue;\n        }\n\n";
 
     for (int i = 0; i < structures.size(); i++)
@@ -577,8 +694,8 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         sourceFile << "            skJson_SaveString(compJson, "
                       "\"componentType\", \""
                    << structure.identifier << "\");\n";
-        sourceFile
-            << "            skJson_PushBack(entJson, compJson);\n";
+        sourceFile << "            skJson_PushBack(entJson, "
+                      "compJson);\n";
         sourceFile << "            skJson_Destroy(compJson);\n";
         sourceFile << "        }\n\n";
     }
@@ -596,8 +713,8 @@ void CreateSource(std::vector<Structure>& structures, char** args,
     sourceFile << "    int entityCount = skJson_GetArraySize(j);\n\n";
     sourceFile
         << "    for (int i = 0; i < entityCount; i++)\n    {\n";
-    sourceFile
-        << "        skJson entJson = skJson_GetArrayElement(j, i);\n";
+    sourceFile << "        skJson entJson = "
+                  "skJson_GetArrayElement(j, i);\n";
     sourceFile << "        skEntityID ent = "
                   "skECS_AddEntity(state->scene);\n\n";
     sourceFile << "        int componentCount = "

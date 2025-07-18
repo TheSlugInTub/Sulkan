@@ -9,6 +9,7 @@ typedef struct skEditor
     skEntityID selectedEntity;
     skECSState* ecsState;
     char sceneName[128];
+    Bool playing;
 } skEditor;
 
 void skEditor_DrawHierarchy(skEditor* editor);
