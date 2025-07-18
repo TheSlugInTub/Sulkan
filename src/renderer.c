@@ -1217,6 +1217,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         skLight* light = (skLight*)skVector_Get(renderer->lights, i);
         mapped[i] = *light;
     }
+
+    if (renderer->lights->size < 1)
+    {
+        memset(renderer->uniformBuffersMap[renderer->currentFrame], 0, 
+                sizeof(skLight) * SK_MAX_LIGHTS);
+    }
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
@@ -2187,10 +2193,10 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     u16 numVertices = 4;
 
     const skVertex vertices[] = {
-        {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-        {{0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-        {{0.5f, 0.0f, 0.5f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        {{-0.5f, 0.0f, 0.5f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+        {{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+        {{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
     };
 
     size_t vertexBufferSize = sizeof(skVertex) * numVertices;

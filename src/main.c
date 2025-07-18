@@ -9,14 +9,6 @@ int main(int argc, char** argv)
     skRenderer renderer = skRenderer_Create(&window);
     
     skRenderer_InitImGui(&renderer);
-    
-    skLight light = {0};
-    glm_vec3_copy((vec3) {0.5f, 0.0f, 2.0f}, light.position);
-    glm_vec3_copy((vec3) {1.0f, 1.0f, 1.0f}, light.color);
-    light.intensity = 10.0f;
-    light.radius = 50.0f;
-
-    skRenderer_AddLight(&renderer, &light);
 
     skSceneHandle scene = skECS_CreateScene();
 
@@ -41,6 +33,7 @@ int main(int argc, char** argv)
 
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
+    skECS_AddSystem(skLightAssociation_StartSys, true);
 
     skECS_StartStartSystems(&ecsState);
 

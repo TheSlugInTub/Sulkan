@@ -2,13 +2,15 @@
 
 #include "include/sulkan/basic_components.h"
 #include "include/sulkan/render_association.h"
+#include "include/sulkan/light_association.h"
 #include "include/sulkan/imgui_layer.h"
 #include "include/sulkan/state.h"
 #include "include/sulkan/json_api.h"
 
 // micah.h
 // Procedurally generated header file for the Sulkan game engine
-// This contains drawer/serializer/deserializer functions for all registered components
+// This contains drawer/serializer/deserializer functions for all
+// registered components
 
 void skName_DrawComponent(skName* object, skECSState* state)
 {
@@ -32,22 +34,25 @@ void skName_LoadComponent(skName* object, skJson j)
 }
 
 // IGNORE
-void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* state)
+void skRenderAssociation_DrawComponent(skRenderAssociation* object,
+                                       skECSState*          state)
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
     {
-        if (skImGui_Button("Create skRenderObject for this skRenderAssociation"))
+        if (skImGui_Button(
+                "Create skRenderObject for this skRenderAssociation"))
         {
             skRenderAssociation_CreateRenderObject(object, state);
         }
-        
+
         if (skImGui_Button("Remove skRenderObject"))
         {
-            skVector_Remove(state->renderer->renderObjects, object->objectIndex);
+            skVector_Remove(state->renderer->renderObjects,
+                            object->objectIndex);
         }
 
         skImGui_InputInt("objectIndex", &object->objectIndex);
- 
+
         const char* types[] = {"Model", "Sprite"};
         int         currentType = (int)object->type;
 
@@ -60,24 +65,29 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* 
         if (object->type == skRenderObjectType_Model)
         {
             skImGui_InputText("modelPath", object->modelPath, 128, 0);
-            skImGui_InputText("texturePath", object->texturePath, 128, 0);
+            skImGui_InputText("texturePath", object->texturePath, 128,
+                              0);
 
             if (skImGui_Button("Update Model"))
             {
                 skModel model = skModel_Create();
                 skModel_Load(&model, object->modelPath);
 
-                skRenderObject* obj = skVector_Get(state->renderer->renderObjects,
-                        object->objectIndex);
-                *obj = skRenderObject_CreateFromModel(state->renderer, &model, 
-                        object->texturePath);
-                
-                VkDeviceSize bufferSize = sizeof(skUniformBufferObject);
+                skRenderObject* obj =
+                    skVector_Get(state->renderer->renderObjects,
+                                 object->objectIndex);
+                *obj = skRenderObject_CreateFromModel(
+                    state->renderer, &model, object->texturePath);
 
-                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+                VkDeviceSize bufferSize =
+                    sizeof(skUniformBufferObject);
+
+                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT;
+                     frame++)
                 {
                     skRenderer_CreateBuffer(
-                        state->renderer, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        state->renderer, bufferSize,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &obj->uniformBuffers[frame],
@@ -85,29 +95,36 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* 
 
                     vkMapMemory(state->renderer->device,
                                 obj->uniformBuffersMemory[frame], 0,
-                                bufferSize, 0, &obj->uniformBuffersMap[frame]);
+                                bufferSize, 0,
+                                &obj->uniformBuffersMap[frame]);
                 }
 
-                skRenderer_CreateDescriptorSetsForObject(state->renderer, obj);
+                skRenderer_CreateDescriptorSetsForObject(
+                    state->renderer, obj);
             }
         }
         if (object->type == skRenderObjectType_Sprite)
         {
-            skImGui_InputText("texturePath", object->texturePath, 128, 0);
-            
+            skImGui_InputText("texturePath", object->texturePath, 128,
+                              0);
+
             if (skImGui_Button("Update Sprite"))
             {
-                skRenderObject* obj = skVector_Get(state->renderer->renderObjects,
-                        object->objectIndex);
-                *obj = skRenderObject_CreateFromSprite(state->renderer,
-                        object->texturePath);
+                skRenderObject* obj =
+                    skVector_Get(state->renderer->renderObjects,
+                                 object->objectIndex);
+                *obj = skRenderObject_CreateFromSprite(
+                    state->renderer, object->texturePath);
 
-                VkDeviceSize bufferSize = sizeof(skUniformBufferObject);
+                VkDeviceSize bufferSize =
+                    sizeof(skUniformBufferObject);
 
-                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT;
+                     frame++)
                 {
                     skRenderer_CreateBuffer(
-                        state->renderer, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        state->renderer, bufferSize,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &obj->uniformBuffers[frame],
@@ -115,25 +132,28 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* 
 
                     vkMapMemory(state->renderer->device,
                                 obj->uniformBuffersMemory[frame], 0,
-                                bufferSize, 0, &obj->uniformBuffersMap[frame]);
+                                bufferSize, 0,
+                                &obj->uniformBuffersMap[frame]);
                 }
 
-                skRenderer_CreateDescriptorSetsForObject(state->renderer, obj);
+                skRenderer_CreateDescriptorSetsForObject(
+                    state->renderer, obj);
             }
         }
-            
-        skRenderObject* obj = skVector_Get(state->renderer->renderObjects,
-                    object->objectIndex);
 
-        if ((skImGui_DragFloat3("position", object->position, 0.1f) || 
-            skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
-            skImGui_DragFloat3("scale", object->scale, 0.1f)) && obj != NULL)
+        skRenderObject* obj = skVector_Get(
+            state->renderer->renderObjects, object->objectIndex);
+
+        if ((skImGui_DragFloat3("position", object->position, 0.1f) ||
+             skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
+             skImGui_DragFloat3("scale", object->scale, 0.1f)) &&
+            obj != NULL)
         {
             mat4 trans = GLM_MAT4_IDENTITY_INIT;
             glm_translate(trans, object->position);
             glm_quat_rotate(trans, object->rotation, trans);
             glm_scale(trans, object->scale);
-            
+
             glm_mat4_copy(trans, obj->transform);
         }
     }
@@ -153,7 +173,8 @@ skJson skRenderAssociation_SaveComponent(skRenderAssociation* object)
     return j;
 }
 
-void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
+void skRenderAssociation_LoadComponent(skRenderAssociation* object,
+                                       skJson               j)
 {
     skJson_LoadInt(j, "objectIndex", &object->objectIndex);
     skJson_LoadInt(j, "type", &object->type);
@@ -162,6 +183,61 @@ void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
     skJson_LoadFloat3(j, "position", object->position);
     skJson_LoadFloat4(j, "rotation", object->rotation);
     skJson_LoadFloat3(j, "scale", object->scale);
+}
+
+// IGNORE
+void skLightAssociation_DrawComponent(skLightAssociation* object,
+                                      skECSState*         state)
+{
+    if (skImGui_CollapsingHeader("skLightAssociation"))
+    {
+        if (skImGui_Button("Create skLight for this association"))
+        {
+            skLightAssociation_CreateLight(object, state);
+        }
+
+        if (skImGui_Button("Destroy skLight"))
+        {
+            skVector_Remove(state->renderer->lights,
+                            object->lightIndex);
+        }
+
+        if (skImGui_InputInt("lightIndex", &object->lightIndex) ||
+            skImGui_DragFloat3("position", object->position, 0.1f) ||
+            skImGui_DragFloat3("color", object->color, 0.1f) ||
+            skImGui_DragFloat("radius", &object->radius, 0.1f) ||
+            skImGui_DragFloat("intensity", &object->intensity, 0.1f))
+        {
+            skLight* light = skVector_Get(state->renderer->lights,
+                                          object->lightIndex);
+            light->intensity = object->intensity;
+            light->radius = object->radius;
+            glm_vec3_copy(object->position, light->position);
+            glm_vec3_copy(object->color, light->color);
+        }
+    }
+}
+
+skJson skLightAssociation_SaveComponent(skLightAssociation* object)
+{
+    skJson j = skJson_Create();
+
+    skJson_SaveInt(j, "lightIndex", object->lightIndex);
+    skJson_SaveFloat3(j, "position", object->position);
+    skJson_SaveFloat3(j, "color", object->color);
+    skJson_SaveFloat(j, "radius", object->radius);
+    skJson_SaveFloat(j, "intensity", object->intensity);
+    return j;
+}
+
+void skLightAssociation_LoadComponent(skLightAssociation* object,
+                                      skJson              j)
+{
+    skJson_LoadInt(j, "lightIndex", &object->lightIndex);
+    skJson_LoadFloat3(j, "position", object->position);
+    skJson_LoadFloat3(j, "color", object->color);
+    skJson_LoadFloat(j, "radius", &object->radius);
+    skJson_LoadFloat(j, "intensity", &object->intensity);
 }
 
 void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
@@ -173,13 +249,23 @@ void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
         skName_DrawComponent(skNameObj, state);
     }
 
-    skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+    skRenderAssociation* skRenderAssociationObj =
+        SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
     if (skRenderAssociationObj != NULL)
     {
-        skRenderAssociation_DrawComponent(skRenderAssociationObj, state);
+        skRenderAssociation_DrawComponent(skRenderAssociationObj,
+                                          state);
     }
 
+    skLightAssociation* skLightAssociationObj =
+        SK_ECS_GET(state->scene, ent, skLightAssociation);
+
+    if (skLightAssociationObj != NULL)
+    {
+        skLightAssociation_DrawComponent(skLightAssociationObj,
+                                         state);
+    }
 }
 
 skJson Micah_SaveAllComponents(skECSState* state)
@@ -189,7 +275,7 @@ skJson Micah_SaveAllComponents(skECSState* state)
     for (int i = 0; i < skECS_EntityCount(state->scene); i++)
     {
         skEntityID ent = skECS_GetEntityAtIndex(state->scene, i);
-        skJson entJson = skJson_Create();
+        skJson     entJson = skJson_Create();
 
         if (!skECS_IsEntityValid(ent))
         {
@@ -206,12 +292,28 @@ skJson Micah_SaveAllComponents(skECSState* state)
             skJson_Destroy(compJson);
         }
 
-        skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+        skRenderAssociation* skRenderAssociationObj =
+            SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
         if (skRenderAssociationObj != NULL)
         {
-            skJson compJson = skRenderAssociation_SaveComponent(skRenderAssociationObj);
-            skJson_SaveString(compJson, "componentType", "skRenderAssociation");
+            skJson compJson = skRenderAssociation_SaveComponent(
+                skRenderAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skRenderAssociation");
+            skJson_PushBack(entJson, compJson);
+            skJson_Destroy(compJson);
+        }
+
+        skLightAssociation* skLightAssociationObj =
+            SK_ECS_GET(state->scene, ent, skLightAssociation);
+
+        if (skLightAssociationObj != NULL)
+        {
+            skJson compJson = skLightAssociation_SaveComponent(
+                skLightAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skLightAssociation");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
@@ -223,36 +325,48 @@ skJson Micah_SaveAllComponents(skECSState* state)
     return j;
 }
 
-
 void Micah_LoadAllComponents(skECSState* state, skJson j)
 {
     int entityCount = skJson_GetArraySize(j);
 
     for (int i = 0; i < entityCount; i++)
     {
-        skJson entJson = skJson_GetArrayElement(j, i);
+        skJson     entJson = skJson_GetArrayElement(j, i);
         skEntityID ent = skECS_AddEntity(state->scene);
 
         int componentCount = skJson_GetArraySize(entJson);
 
-        for (int compIndex = 0; compIndex < componentCount; compIndex++)
+        for (int compIndex = 0; compIndex < componentCount;
+             compIndex++)
         {
-            skJson compJson = skJson_GetArrayElement(entJson, compIndex);
+            skJson compJson =
+                skJson_GetArrayElement(entJson, compIndex);
 
             char componentType[256];
-            skJson_LoadString(compJson, "componentType", componentType);
+            skJson_LoadString(compJson, "componentType",
+                              componentType);
 
             // Check component type and assign/load accordingly
-            if (false) {} // Dummy condition for cleaner generated code
+            if (false) {
+            } // Dummy condition for cleaner generated code
             else if (strcmp(componentType, "skName") == 0)
             {
-                skName* comp = SK_ECS_ASSIGN(state->scene, ent, skName);
+                skName* comp =
+                    SK_ECS_ASSIGN(state->scene, ent, skName);
                 skName_LoadComponent(comp, compJson);
             }
-            else if (strcmp(componentType, "skRenderAssociation") == 0)
+            else if (strcmp(componentType, "skRenderAssociation") ==
+                     0)
             {
-                skRenderAssociation* comp = SK_ECS_ASSIGN(state->scene, ent, skRenderAssociation);
+                skRenderAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skRenderAssociation);
                 skRenderAssociation_LoadComponent(comp, compJson);
+            }
+            else if (strcmp(componentType, "skLightAssociation") == 0)
+            {
+                skLightAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skLightAssociation);
+                skLightAssociation_LoadComponent(comp, compJson);
             }
         }
     }
@@ -269,6 +383,10 @@ void Micah_ComponentAddMenu(skECSState* state, skEntityID ent)
         if (skImGui_MenuItem("skRenderAssociation"))
         {
             SK_ECS_ASSIGN(state->scene, ent, skRenderAssociation);
+        }
+        if (skImGui_MenuItem("skLightAssociation"))
+        {
+            SK_ECS_ASSIGN(state->scene, ent, skLightAssociation);
         }
 
         skImGui_EndPopup();

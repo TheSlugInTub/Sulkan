@@ -85,5 +85,27 @@
             "texturePath": "res/textures/image.png",
             "type": 1
         }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "LightAssoc"
+        },
+        {
+            "color": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "componentType": "skLightAssociation",
+            "intensity": 1.7999999523162842,
+            "lightIndex": 0,
+            "position": [
+                -0.03700000047683716,
+                1.399999976158142,
+                0.5
+            ],
+            "radius": 1.7000000476837158
+        }
     ]
 ]

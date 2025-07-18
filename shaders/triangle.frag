@@ -25,14 +25,21 @@ void main()
     vec3 cameraPos = vec3(2.0, 0.0, 1.0);
 
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
+    vec3 ambient = 0.15 * baseColor;
     
     vec3 norm = normalize(fragNormal);
-    vec3 lightDir = normalize(lights[0].position - fragWorldPos);
-    float diff = max(dot(norm, lightDir), 0.0);
 
-    vec3 diffuse = diff * lights[0].color;
+    vec3 result = ambient;
+
+    for (int i = 0; i < 1; i++)
+    {
+        vec3 lightDir = normalize(lights[i].position - fragWorldPos);
+        float diff = max(dot(norm, lightDir), 0.0);
+
+        vec3 diffuse = vec3(diff);
   
-    vec3 result = (diffuse) * baseColor;
+        result += (ambient + diffuse) * baseColor;
+    }
 
     outColor = vec4(result, 1.0);
 }
