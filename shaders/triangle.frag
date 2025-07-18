@@ -1,6 +1,5 @@
 #version 450
 
-layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragWorldPos;
 layout(location = 3) in vec3 fragNormal;
@@ -23,11 +22,17 @@ layout(std430, set = 1, binding = 0) readonly buffer LightBuffer {
 
 void main() 
 {
+    vec3 cameraPos = vec3(2.0, 0.0, 1.0);
+
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
     
-    vec3 cameraPos = vec3(2.0f, 0.0f, 1.0f);
-        
-    skLight light = lights[0];
+    vec3 norm = normalize(fragNormal);
+    vec3 lightDir = normalize(lights[0].position - fragWorldPos);
+    float diff = max(dot(norm, lightDir), 0.0);
 
-    outColor = vec4(light.position.x, 0.0, 0.0, 1.0);
+    vec3 diffuse = diff * lights[0].color;
+  
+    vec3 result = (diffuse) * baseColor;
+
+    outColor = vec4(result, 1.0);
 }

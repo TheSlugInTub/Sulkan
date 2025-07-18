@@ -13,8 +13,8 @@ int main(int argc, char** argv)
     skLight light = {0};
     glm_vec3_copy((vec3) {0.5f, 0.0f, 2.0f}, light.position);
     glm_vec3_copy((vec3) {1.0f, 1.0f, 1.0f}, light.color);
-    light.intensity = 2.0f;
-    light.radius = 10.0f;
+    light.intensity = 10.0f;
+    light.radius = 50.0f;
 
     skRenderer_AddLight(&renderer, &light);
 
