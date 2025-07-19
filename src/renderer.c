@@ -566,9 +566,10 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 2;
+    pipelineLayoutInfo.setLayoutCount = 3;
     VkDescriptorSetLayout layouts[] = { renderer->descriptorSetLayout, 
-                                        renderer->lightDescriptorSetLayout };
+                                        renderer->lightDescriptorSetLayout,
+                                        renderer->uniformDescriptorSetLayout};
     pipelineLayoutInfo.pSetLayouts = layouts;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = NULL;
@@ -931,12 +932,13 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                              VK_INDEX_TYPE_UINT32);
 
         VkDescriptorSet sets[] = {obj->descriptorSets[renderer->currentFrame], 
-                            renderer->descriptorSets[renderer->currentFrame]};
+                            renderer->lightDescriptorSets[renderer->currentFrame],
+                            renderer->uniformDescriptorSets[renderer->currentFrame]};
 
         // Bind descriptor set for this object
         vkCmdBindDescriptorSets(
             commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            renderer->pipelineLayout, 0, 2,
+            renderer->pipelineLayout, 0, 3,
             sets, 0, NULL);
 
         // Draw this object
@@ -1210,7 +1212,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
                sizeof(ubo));
     }
   
-    skLight* mapped = (skLight*)renderer->uniformBuffersMap[renderer->currentFrame];
+    skLight* mapped = (skLight*)renderer->storageBuffersMap[renderer->currentFrame];
     
     for (size_t i = 0; i < renderer->lights->size; i++)
     {
@@ -1218,11 +1220,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         mapped[i] = *light;
     }
 
-    if (renderer->lights->size < 1)
-    {
-        memset(renderer->uniformBuffersMap[renderer->currentFrame], 0, 
-                sizeof(skLight) * SK_MAX_LIGHTS);
-    }
+    skGlobalUniformBufferObject ubo = {.lightCount = renderer->lights->size};
+
+    printf("lightCounnt: %d\n", ubo.lightCount);
+
+    memcpy(renderer->uniformBuffersMap[renderer->currentFrame], &ubo,
+               sizeof(skGlobalUniformBufferObject));
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
@@ -1669,7 +1672,7 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     lightBufferBinding.descriptorCount = 1;
     lightBufferBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     lightBufferBinding.pImmutableSamplers = NULL;
-    
+
     VkDescriptorSetLayoutCreateInfo layoutInfo2 = {0};
     layoutInfo2.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1682,11 +1685,32 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     {
         printf("SK ERROR: Failed to create descriptor set layout for lights.\n");
     }
+    
+    VkDescriptorSetLayoutBinding uniformBinding = {0};
+    uniformBinding.binding = 0;
+    uniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformBinding.descriptorCount = 1;
+    uniformBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    uniformBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo3 = {0};
+    layoutInfo3.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo3.bindingCount = 1;
+    layoutInfo3.pBindings = &uniformBinding;
+
+    if (vkCreateDescriptorSetLayout(
+            renderer->device, &layoutInfo3, NULL,
+            &renderer->uniformDescriptorSetLayout) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create descriptor set layout for global uniforms.\n");
+    }
 }
 
 void skRenderer_CreateDescriptorSets(skRenderer* renderer)
 {
     VkDeviceSize bufferSize = sizeof(skLight) * SK_MAX_LIGHTS;
+    VkDeviceSize uniformBufferSize = sizeof(skGlobalUniformBufferObject);
     
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
@@ -1694,12 +1718,23 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
             renderer, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &renderer->storageBuffers[frame],
+            &renderer->storageBuffersMemory[frame]);
+
+        vkMapMemory(renderer->device,
+                    renderer->storageBuffersMemory[frame], 0,
+                    bufferSize, 0, &renderer->storageBuffersMap[frame]);
+        
+        skRenderer_CreateBuffer(
+            renderer, uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &renderer->uniformBuffers[frame],
             &renderer->uniformBuffersMemory[frame]);
 
         vkMapMemory(renderer->device,
                     renderer->uniformBuffersMemory[frame], 0,
-                    bufferSize, 0, &renderer->uniformBuffersMap[frame]);
+                    uniformBufferSize, 0, &renderer->uniformBuffersMap[frame]);
     }
 
     VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
@@ -1715,7 +1750,49 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
     allocInfo.pSetLayouts = layouts;
 
     if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
-                                 renderer->descriptorSets) != VK_SUCCESS)
+                                 renderer->lightDescriptorSets) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate descriptor sets for "
+               "light.");
+    }
+
+    // Update descriptor sets
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        VkDescriptorBufferInfo bufferInfo = {0};
+        bufferInfo.buffer = renderer->storageBuffers[frame];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(skLight) * SK_MAX_LIGHTS;
+
+        VkWriteDescriptorSet descriptorWrites[] = {{0}};
+        descriptorWrites[0].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = renderer->lightDescriptorSets[frame];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
+                               0, NULL);
+    }
+    
+    VkDescriptorSetLayout uniformLayouts[SK_FRAMES_IN_FLIGHT];
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        uniformLayouts[i] = renderer->uniformDescriptorSetLayout;
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo2 = {0};
+    allocInfo2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo2.descriptorPool = renderer->descriptorPool;
+    allocInfo2.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
+    allocInfo2.pSetLayouts = uniformLayouts;
+
+    if (vkAllocateDescriptorSets(renderer->device, &allocInfo2,
+                                 renderer->uniformDescriptorSets) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to allocate descriptor sets for "
                "light.");
@@ -1727,16 +1804,16 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         VkDescriptorBufferInfo bufferInfo = {0};
         bufferInfo.buffer = renderer->uniformBuffers[frame];
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(skLight) * SK_MAX_LIGHTS;
+        bufferInfo.range = sizeof(skGlobalUniformBufferObject);
 
         VkWriteDescriptorSet descriptorWrites[] = {{0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = renderer->descriptorSets[frame];
+        descriptorWrites[0].dstSet = renderer->uniformDescriptorSets[frame];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType =
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &bufferInfo;
 

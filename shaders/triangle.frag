@@ -20,6 +20,11 @@ layout(std430, set = 1, binding = 0) readonly buffer LightBuffer {
     skLight lights[];
 };
 
+layout(set = 2, binding = 0) uniform skGlobalUniformBufferObject 
+{
+    int lightCount;
+} gubo;
+
 void main() 
 {
     vec3 cameraPos = vec3(2.0, 0.0, 1.0);
@@ -31,7 +36,7 @@ void main()
 
     vec3 result = ambient;
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < gubo.lightCount; i++)
     {
         vec3 lightDir = normalize(lights[i].position - fragWorldPos);
         float diff = max(dot(norm, lightDir), 0.0);
@@ -41,5 +46,5 @@ void main()
         result += (ambient + diffuse) * baseColor;
     }
 
-    outColor = vec4(result, 1.0);
+    outColor = vec4(gubo.lightCount, 0.0, 0.0, 1.0);
 }

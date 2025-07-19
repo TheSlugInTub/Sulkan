@@ -4,14 +4,6 @@
 void skLightAssociation_CreateLight(skLightAssociation* assoc,
         skECSState* state)
 {
-    skLight* lightPtr = (skLight*)skVector_Get(state->renderer->lights, 
-            assoc->lightIndex);
-
-    if (lightPtr != NULL)
-    {
-        return;
-    }
-
     skLight light = {0};
     glm_vec3_copy(assoc->position, light.position);
     glm_vec3_copy(assoc->color, light.color);

@@ -48,6 +48,11 @@ typedef struct skUniformBufferObject
     mat4 proj;
 } skUniformBufferObject;
 
+typedef struct skGlobalUniformBufferObject
+{
+    int lightCount;
+} skGlobalUniformBufferObject;
+
 typedef struct skRenderer
 {
     skWindow*                window;
@@ -74,6 +79,7 @@ typedef struct skRenderer
     u32                      currentFrame;
     VkDescriptorSetLayout    descriptorSetLayout;
     VkDescriptorSetLayout    lightDescriptorSetLayout;
+    VkDescriptorSetLayout    uniformDescriptorSetLayout;
     VkDescriptorPool         descriptorPool;
     VkImage                  depthImage;
     VkImageView              depthImageView;
@@ -82,7 +88,12 @@ typedef struct skRenderer
     skVector*                renderObjects; // skRenderObject
     skVector*                lights;        // skLight
 
-    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkDescriptorSet lightDescriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer        storageBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory  storageBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void*           storageBuffersMap[SK_FRAMES_IN_FLIGHT];
+
+    VkDescriptorSet uniformDescriptorSets[SK_FRAMES_IN_FLIGHT];
     VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
     VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
     void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];

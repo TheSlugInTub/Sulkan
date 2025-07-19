@@ -145,3 +145,7 @@ semaphores and our command buffer. We then submit our submit info onto the graph
 we made earlier. And after submitting the command buffer to be drawn, we present it with
 `vkQueuePresentKHR`, this doesn't immediately present the potentially half drawn image onto
 the screen of course, it waits for our semaphore to be signalled and then presents it.
+
+## Tips and tricks
+
+You can make multiple shader bindings in a single descriptor set.

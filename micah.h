@@ -202,8 +202,9 @@ void skLightAssociation_DrawComponent(skLightAssociation* object,
                             object->lightIndex);
         }
 
-        if (skImGui_InputInt("lightIndex", &object->lightIndex) ||
-            skImGui_DragFloat3("position", object->position, 0.1f) ||
+        skImGui_InputInt("lightIndex", &object->lightIndex);
+
+        if (skImGui_DragFloat3("position", object->position, 0.1f) ||
             skImGui_DragFloat3("color", object->color, 0.1f) ||
             skImGui_DragFloat("radius", &object->radius, 0.1f) ||
             skImGui_DragFloat("intensity", &object->intensity, 0.1f))
