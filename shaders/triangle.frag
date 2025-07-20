@@ -46,5 +46,5 @@ void main()
         result += (ambient + diffuse) * baseColor;
     }
 
-    outColor = vec4(gubo.lightCount, 0.0, 0.0, 1.0);
+    outColor = vec4(result, 1.0);
 }

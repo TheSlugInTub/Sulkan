@@ -1194,7 +1194,6 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 
         skUniformBufferObject ubo = {0};
 
-        // Use the object's transform matrix
         glm_mat4_copy(obj->transform, ubo.model);
 
         glm_mat4_copy(renderer->viewTransform, ubo.view);
@@ -1207,22 +1206,30 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
-        // Update this object's uniform buffer
         memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(ubo));
     }
   
-    skLight* mapped = (skLight*)renderer->storageBuffersMap[renderer->currentFrame];
+    char* mapped = (char*)renderer->storageBuffersMap[renderer->currentFrame];
     
-    for (size_t i = 0; i < renderer->lights->size; i++)
+    for (size_t i = 0; i < renderer->lights->size; i++) 
     {
         skLight* light = (skLight*)skVector_Get(renderer->lights, i);
-        mapped[i] = *light;
+        char* dest = mapped + i * 48;  // Destination with padding
+    
+        // Copy position (12 bytes) + 4-byte padding
+        memcpy(dest, &light->position, sizeof(vec3));
+        dest += 16;  // Advance 16 bytes (position + padding)
+    
+        // Copy color (12 bytes) + 4-byte padding
+        memcpy(dest, &light->color, sizeof(vec3));
+        dest += 16;  // Advance 16 bytes (color + padding)
+    
+        memcpy(dest, &light->radius, sizeof(float));
+        memcpy(dest + 4, &light->intensity, sizeof(float));
     }
 
     skGlobalUniformBufferObject ubo = {.lightCount = renderer->lights->size};
-
-    printf("lightCounnt: %d\n", ubo.lightCount);
 
     memcpy(renderer->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(skGlobalUniformBufferObject));
@@ -1709,7 +1716,7 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
 
 void skRenderer_CreateDescriptorSets(skRenderer* renderer)
 {
-    VkDeviceSize bufferSize = sizeof(skLight) * SK_MAX_LIGHTS;
+    VkDeviceSize bufferSize = 48 * SK_MAX_LIGHTS;
     VkDeviceSize uniformBufferSize = sizeof(skGlobalUniformBufferObject);
     
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
