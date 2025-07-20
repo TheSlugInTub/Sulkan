@@ -13,23 +13,23 @@ typedef struct
     vec3 position;
     vec3 normal;
     vec2 textureCoordinates;
-    // vec3 tangent;
-    // vec3 bitangent;
+    vec3 tangent;
+    vec3 bitangent;
 } skVertex;
 
 typedef struct
 {
-    char         type[64];
-    char         path[128];
-    struct aiTexel* embeddedData; // If the texture is embedded, 
-                              // its data will be stored here
+    char            type[64];
+    char            path[128];
+    struct aiTexel* embeddedData; // If the texture is embedded,
+                                  // its data will be stored here
 } skTexture;
 
 typedef struct
 {
-    skVector*    vertices; // skVertex
-    skVector*    indices;  // unsigned int
-    skVector*    textures; // skTexture
+    skVector* vertices; // skVertex
+    skVector* indices;  // unsigned int
+    skVector* textures; // skTexture
 } skMesh;
 
 skMesh skMesh_Create(skVector* meshVertices, skVector* meshIndices,
@@ -46,15 +46,15 @@ typedef struct
 skModel skModel_Create();
 void    skModel_Load(skModel* model, const char* path);
 void    skModel_ProcessNode(skModel* model, struct aiNode* node,
-                           const struct aiScene* scene);
-skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
-                           const struct aiScene* scene);
-void skModel_LoadMaterialTextures(skModel*              model,
-                                  struct aiMaterial*    mat,
-                                  enum aiTextureType    type,
-                                  const char*           typeName,
-                                  const struct aiScene* scene,
-                                  skVector*             textures);
+                            const struct aiScene* scene);
+skMesh  skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
+                            const struct aiScene* scene);
+void    skModel_LoadMaterialTextures(skModel*              model,
+                                     struct aiMaterial*    mat,
+                                     enum aiTextureType    type,
+                                     const char*           typeName,
+                                     const struct aiScene* scene,
+                                     skVector*             textures);
 
 unsigned int skTextureFromFile(const char* path,
                                const char* directory);

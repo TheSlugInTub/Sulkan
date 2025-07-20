@@ -3,10 +3,13 @@
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragWorldPos;
 layout(location = 3) in vec3 fragNormal;
+layout(location = 4) in vec3 fragTangent;
+layout(location = 5) in vec3 fragBitangent;
 
 layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
+layout(set = 0, binding = 2) uniform sampler2D normalSampler;
 
 struct skLight 
 {
@@ -33,13 +36,16 @@ void main()
     vec3 ambient = 0.15 * baseColor;
     
     vec3 norm = normalize(fragNormal);
+    vec3 normal;
 
     vec3 result = ambient;
 
     for (int i = 0; i < gubo.lightCount; i++)
     {
+        normal = texture(normalSampler, fragTexCoord).rgb;
+
         vec3 lightDir = normalize(lights[i].position - fragWorldPos);
-        float diff = max(dot(norm, lightDir), 0.0);
+        float diff = max(dot(normal, lightDir), 0.0);
 
         vec3 diffuse = vec3(diff);
   

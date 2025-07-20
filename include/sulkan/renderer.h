@@ -214,6 +214,12 @@ typedef struct skRenderObject
     VkDeviceMemory textureImageMemory;
     VkImageView    textureImageView;
     VkSampler      textureSampler;
+    
+    VkImage        normalImage;
+    VkDeviceMemory normalImageMemory;
+    VkImageView    normalImageView;
+    VkSampler      normalSampler;
+
     u32            indexCount;
 
     VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];

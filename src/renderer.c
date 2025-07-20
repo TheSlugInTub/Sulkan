@@ -22,12 +22,12 @@ VkVertexInputBindingDescription skVertex_GetBindingDescription()
 
 typedef struct VkVertexInputAttributeDescriptions
 {
-    VkVertexInputAttributeDescription descriptions[3];
+    VkVertexInputAttributeDescription descriptions[5];
 } VkVertexInputAttributeDescriptions;
 
 VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
 {
-    VkVertexInputAttributeDescription descriptions[3] = {0};
+    VkVertexInputAttributeDescription descriptions[5] = {0};
 
     descriptions[0].binding = 0;
     descriptions[0].location = 0;
@@ -43,9 +43,20 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
     descriptions[2].location = 2;
     descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
     descriptions[2].offset = offsetof(skVertex, textureCoordinates);
+    
+    descriptions[3].binding = 0;
+    descriptions[3].location = 3;
+    descriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+    descriptions[3].offset = offsetof(skVertex, tangent);
+    
+    descriptions[4].binding = 0;
+    descriptions[4].location = 4;
+    descriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+    descriptions[4].offset = offsetof(skVertex, bitangent);
 
     VkVertexInputAttributeDescriptions pair = {
-        descriptions[0], descriptions[1], descriptions[2]};
+        descriptions[0], descriptions[1], descriptions[2], 
+        descriptions[3], descriptions[4] };
 
     return pair;
 }
@@ -474,7 +485,7 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     vertexInputInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = 3;
+    vertexInputInfo.vertexAttributeDescriptionCount = 5;
     vertexInputInfo.pVertexAttributeDescriptions =
         attributeDescriptions.descriptions;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
@@ -1663,14 +1674,23 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = NULL;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    VkDescriptorSetLayoutBinding normalLayoutBinding = {0};
+    normalLayoutBinding.binding = 2;
+    normalLayoutBinding.descriptorCount = 1;
+    normalLayoutBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalLayoutBinding.pImmutableSamplers = NULL;
+    normalLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
-                                               samplerLayoutBinding};
+                                               samplerLayoutBinding,
+                                               normalLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(
@@ -1875,7 +1895,7 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
         (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount =
-        (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT) +
+        (SK_MAX_RENDER_OBJECTS * SK_FRAMES_IN_FLIGHT * 2) +
         SK_FRAMES_IN_FLIGHT;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount =
@@ -1933,8 +1953,14 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = obj->textureImageView;
         imageInfo.sampler = obj->textureSampler;
+        
+        VkDescriptorImageInfo normalImageInfo = {0};
+        normalImageInfo.imageLayout =
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        normalImageInfo.imageView = obj->normalImageView;
+        normalImageInfo.sampler = obj->normalSampler;
 
-        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}};
+        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}, {0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = obj->descriptorSets[frame];
@@ -1954,8 +1980,18 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
+        
+        descriptorWrites[2].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = obj->descriptorSets[frame];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType =
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pImageInfo = &normalImageInfo;
 
-        vkUpdateDescriptorSets(renderer->device, 2, descriptorWrites,
+        vkUpdateDescriptorSets(renderer->device, 3, descriptorWrites,
                                0, NULL);
     }
 }
@@ -2105,6 +2141,88 @@ void skRenderer_Destroy(skRenderer* renderer)
     vkDestroyRenderPass(renderer->device, renderer->renderPass, NULL);
 }
 
+void skRenderer_CreateTexture(skRenderer* renderer, 
+                              VkImage        textureImage,
+                              VkDeviceMemory textureImageMemory,
+                              VkImageView    textureImageView,
+                              VkSampler      textureSampler,
+                              stbi_uc*       pixels,
+                              VkDeviceSize   imageSize,
+                              int texWidth, int texHeight)
+{  
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &textureImage,
+        &textureImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 textureImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    textureImageView = skRenderer_CreateImageView(
+        renderer, textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &textureSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create texture sampler.");
+    }
+}
+
 skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
                                               skModel*    model,
                                               const char* texturePath)
@@ -2185,6 +2303,8 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
     vkFreeMemory(renderer->device, indexStagingMemory, NULL);
 
     // Create texture image
+
+    {
 
     int      texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
@@ -2270,7 +2390,93 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
         printf("SK ERROR: Failed to create texture sampler.");
     }
 
+    }
+
     glm_mat4_identity(obj.transform);
+    
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load("res/textures/normal.png", &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load texture image.");
+        pixels = stbi_load("res/textures/image.png", &texWidth, &texHeight,
+                           &texChannels, STBI_rgb_alpha);
+    }
+
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
+        &obj.normalImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.normalImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    obj.normalImageView = skRenderer_CreateImageView(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &obj.normalSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create normal sampler.");
+    }
 
     return obj;
 }
@@ -2361,6 +2567,8 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
 
     // Create texture image
 
+    { 
+
     int      texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
                                 &texChannels, STBI_rgb_alpha);
@@ -2444,6 +2652,90 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     }
 
     glm_mat4_identity(obj.transform);
+
+    }
+    
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load("res/textures/normal.png", &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load texture image.");
+    }
+
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
+        &obj.normalImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.normalImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    obj.normalImageView = skRenderer_CreateImageView(
+        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &obj.normalSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create normal sampler.");
+    }
 
     return obj;
 }

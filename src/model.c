@@ -134,6 +134,7 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
     for (unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
         skVertex vertex;
+
         // Position
         skAssimpVec3ToGLM(&mesh->mVertices[i], vertex.position);
 
@@ -150,6 +151,14 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
                 mesh->mTextureCoords[0][i].x;
             vertex.textureCoordinates[1] =
                 mesh->mTextureCoords[0][i].y;
+
+            vertex.tangent[0] = mesh->mTangents[i].x;
+            vertex.tangent[1] = mesh->mTangents[i].y;
+            vertex.tangent[2] = mesh->mTangents[i].z;
+            
+            vertex.bitangent[0] = mesh->mBitangents[i].x;
+            vertex.bitangent[1] = mesh->mBitangents[i].y;
+            vertex.bitangent[2] = mesh->mBitangents[i].z;
         }
         else
         {

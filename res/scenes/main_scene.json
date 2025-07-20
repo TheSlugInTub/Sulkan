@@ -129,5 +129,34 @@
             ],
             "radius": 1.0
         }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "mapp"
+        },
+        {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/sphere.fbx",
+            "objectIndex": 3,
+            "position": [
+                1.0,
+                0.0,
+                0.4000000059604645
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ],
+            "texturePath": "res/textures/concrete.png",
+            "type": 0
+        }
     ]
 ]
