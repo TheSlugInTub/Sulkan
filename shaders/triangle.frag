@@ -43,7 +43,7 @@ void main()
 
         vec3 diffuse = vec3(diff);
   
-        result += (ambient + diffuse) * baseColor;
+        result += (ambient + diffuse) * baseColor * lights[i].color;
     }
 
     outColor = vec4(result, 1.0);
