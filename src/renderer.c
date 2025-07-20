@@ -1219,14 +1219,21 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     
         // Copy position (12 bytes) + 4-byte padding
         memcpy(dest, &light->position, sizeof(vec3));
-        dest += 16;  // Advance 16 bytes (position + padding)
+        dest += 16;  // Advance 16 bytes (position + padding for 
+                     // Vulkan memory alignment for vec3s)
     
         // Copy color (12 bytes) + 4-byte padding
         memcpy(dest, &light->color, sizeof(vec3));
-        dest += 16;  // Advance 16 bytes (color + padding)
+
+        // I really don't know why I have to advance 12 bytes here
+        // instead of 16 because if I do, the radius gets copied
+        // to the intensity variable in the float
+        dest += 12;  // Advance 12 bytes
     
         memcpy(dest, &light->radius, sizeof(float));
-        memcpy(dest + 4, &light->intensity, sizeof(float));
+        dest += sizeof(float);
+
+        memcpy(dest, &light->intensity, sizeof(float));
     }
 
     skGlobalUniformBufferObject ubo = {.lightCount = renderer->lights->size};

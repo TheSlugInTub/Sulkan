@@ -98,14 +98,14 @@
                 1.0
             ],
             "componentType": "skLightAssociation",
-            "intensity": 1.7999999523162842,
+            "intensity": 1.0,
             "lightIndex": 0,
             "position": [
                 -17.336999893188477,
                 1.399999976158142,
                 9.699999809265137
             ],
-            "radius": 1.7000000476837158
+            "radius": 1.0
         }
     ],
     [
@@ -120,14 +120,14 @@
                 1.0
             ],
             "componentType": "skLightAssociation",
-            "intensity": 10.0,
+            "intensity": 1.0,
             "lightIndex": 1,
             "position": [
                 15.899999618530273,
                 0.0,
                 13.600000381469727
             ],
-            "radius": 50.0
+            "radius": 1.0
         }
     ]
 ]
