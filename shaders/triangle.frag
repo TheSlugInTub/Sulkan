@@ -46,8 +46,8 @@ void main()
         normal = texture(normalSampler, fragTexCoord).rgb;
         normal = normalize(normal * 5.0 - 1.0);
 
-        vec3 lightDir = normalize(lights[i].position - fragWorldPos);
-        float diff = max(dot(norm, lightDir), 0.0);
+        vec3 lightDir = fragTBN * normalize(lights[i].position - fragWorldPos);
+        float diff = max(dot(normal, lightDir), 0.0);
 
         vec3 diffuse = vec3(diff);
   

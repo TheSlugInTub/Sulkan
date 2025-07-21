@@ -24,7 +24,7 @@
                 1.0,
                 1.0
             ],
-            "texturePath": "res/textures/room.png",
+            "texturePath": "res/textures/room.bmp",
             "type": 0
         }
     ],
@@ -53,7 +53,7 @@
                 1.0,
                 1.0
             ],
-            "texturePath": "res/textures/room.png",
+            "texturePath": "res/textures/room.bmp",
             "type": 0
         }
     ],
@@ -82,7 +82,7 @@
                 1.0,
                 1.0
             ],
-            "texturePath": "res/textures/image.png",
+            "texturePath": "res/textures/image.bmp",
             "type": 1
         }
     ],
@@ -155,7 +155,7 @@
                 0.20000000298023224,
                 0.20000000298023224
             ],
-            "texturePath": "res/textures/concrete.png",
+            "texturePath": "res/textures/concrete.bmp",
             "type": 0
         }
     ]
