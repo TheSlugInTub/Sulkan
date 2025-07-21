@@ -2225,7 +2225,8 @@ void skRenderer_CreateTexture(skRenderer* renderer,
 
 skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
                                               skModel*    model,
-                                              const char* texturePath)
+                                              const char* texturePath,
+                                              const char* normalTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2395,16 +2396,17 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
     glm_mat4_identity(obj.transform);
     
     int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
+    stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
                                 &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels)
     {
         printf("SK ERROR: Failed to load texture image.");
-        pixels = stbi_load("res/textures/image.bmp", &texWidth, &texHeight,
+        pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
                            &texChannels, STBI_rgb_alpha);
     }
+    
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     VkBuffer       imageStagingBuffer;
     VkDeviceMemory imageStagingBufferMemory;
@@ -2483,7 +2485,8 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
 
 skRenderObject
 skRenderObject_CreateFromSprite(skRenderer* renderer,
-                                const char* texturePath)
+                                const char* texturePath,
+                                const char* normalTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2656,14 +2659,17 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     }
     
     int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
+    stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
                                 &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels)
     {
         printf("SK ERROR: Failed to load texture image.");
+        pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
+                           &texChannels, STBI_rgb_alpha);
     }
+    
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     VkBuffer       imageStagingBuffer;
     VkDeviceMemory imageStagingBufferMemory;

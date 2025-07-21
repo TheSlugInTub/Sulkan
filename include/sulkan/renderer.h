@@ -214,13 +214,13 @@ typedef struct skRenderObject
     VkDeviceMemory textureImageMemory;
     VkImageView    textureImageView;
     VkSampler      textureSampler;
-    
+
     VkImage        normalImage;
     VkDeviceMemory normalImageMemory;
     VkImageView    normalImageView;
     VkSampler      normalSampler;
 
-    u32            indexCount;
+    u32 indexCount;
 
     VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
     VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
@@ -232,10 +232,12 @@ typedef struct skRenderObject
 
 skRenderObject
 skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
-                               const char* texturePath);
+                               const char* texturePath,
+                               const char* normalTexturePath);
 skRenderObject
      skRenderObject_CreateFromSprite(skRenderer* renderer,
-                                     const char* texturePath);
+                                     const char* texturePath,
+                                     const char* normalTexturePath);
 void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
                                               skRenderObject* obj);
 void skRenderer_AddRenderObject(skRenderer*     renderer,

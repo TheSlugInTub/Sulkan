@@ -17,6 +17,7 @@ typedef struct skRenderAssociation
 
     char modelPath[128];
     char texturePath[128];
+    char normalTexturePath[128];
 
     vec3 position;
     vec4 rotation; // Quaternion
