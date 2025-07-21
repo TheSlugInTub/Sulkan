@@ -18,6 +18,7 @@ layout(location = 2) out vec3 fragWorldPos;
 layout(location = 3) out vec3 fragNormal;
 layout(location = 4) out vec3 fragTangent;
 layout(location = 5) out vec3 fragBitangent;
+layout(location = 6) out mat3 fragTBN;
 
 void main() 
 {
@@ -26,6 +27,11 @@ void main()
     fragTexCoord = inTexCoord;
     fragTangent = inTangent;
     fragBitangent = inBitangent;
+        
+    vec3 T = normalize(vec3(ubo.model * vec4(inTangent,   0.0)));
+    vec3 B = normalize(vec3(ubo.model * vec4(inBitangent, 0.0)));
+    vec3 N = normalize(vec3(ubo.model * vec4(inNormal,    0.0)));
+    fragTBN = transpose(mat3(T, B, N));
 
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
 }

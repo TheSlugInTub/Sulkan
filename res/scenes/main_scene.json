@@ -115,12 +115,12 @@
         },
         {
             "color": [
-                -0.10000000149011612,
-                1.0,
+                0.08299999684095383,
+                0.40799999237060547,
                 1.0
             ],
             "componentType": "skLightAssociation",
-            "intensity": 1.0,
+            "intensity": 2.8350000381469727,
             "lightIndex": 1,
             "position": [
                 15.899999618530273,

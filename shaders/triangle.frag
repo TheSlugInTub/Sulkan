@@ -5,6 +5,7 @@ layout(location = 2) in vec3 fragWorldPos;
 layout(location = 3) in vec3 fragNormal;
 layout(location = 4) in vec3 fragTangent;
 layout(location = 5) in vec3 fragBitangent;
+layout(location = 6) in mat3 fragTBN;
 
 layout(location = 0) out vec4 outColor;
 
@@ -43,9 +44,10 @@ void main()
     for (int i = 0; i < gubo.lightCount; i++)
     {
         normal = texture(normalSampler, fragTexCoord).rgb;
+        normal = normalize(normal * 5.0 - 1.0);
 
         vec3 lightDir = normalize(lights[i].position - fragWorldPos);
-        float diff = max(dot(normal, lightDir), 0.0);
+        float diff = max(dot(norm, lightDir), 0.0);
 
         vec3 diffuse = vec3(diff);
   
