@@ -530,7 +530,7 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
@@ -1471,7 +1471,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     skUniformBufferObject skyboxUbo = {0};
     glm_mat4_copy(renderer->skyboxObject.transform, skyboxUbo.model);
     
-    glm_mat4_copy(renderer->viewTransform, skyboxUbo.view);
+    mat4 viewNoTranslation;
+    glm_mat4_copy(renderer->viewTransform, viewNoTranslation);
+    viewNoTranslation[3][0] = 0.0f;  // Remove translation
+    viewNoTranslation[3][1] = 0.0f;
+    viewNoTranslation[3][2] = 0.0f;
+    glm_mat4_copy(viewNoTranslation, skyboxUbo.view);
     
     // Projection (same as regular objects)
     mat4 proj;
