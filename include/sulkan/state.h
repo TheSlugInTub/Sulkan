@@ -10,4 +10,5 @@ typedef struct skECSState
     skSceneHandle scene;
     skCamera* camera;
     skWindow* window;
+    float deltaTime;
 } skECSState;

@@ -34,6 +34,7 @@ int main(int argc, char** argv)
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
     skECS_AddSystem(skLightAssociation_StartSys, true);
+    skECS_AddSystem(skDeltaTimeSystem, false);
 
     skECS_StartStartSystems(&ecsState);
 

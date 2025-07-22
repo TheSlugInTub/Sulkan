@@ -1248,6 +1248,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     }
 
     skGlobalUniformBufferObject ubo = {.lightCount = renderer->lights->size};
+    glm_vec3_copy(renderer->viewPos, ubo.viewPos);
 
     memcpy(renderer->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(skGlobalUniformBufferObject));

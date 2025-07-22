@@ -9,7 +9,8 @@
 
 // micah.h
 // Procedurally generated header file for the Sulkan game engine
-// This contains drawer/serializer/deserializer functions for all registered components
+// This contains drawer/serializer/deserializer functions for all
+// registered components
 
 void skName_DrawComponent(skName* object, skECSState* state)
 {
@@ -103,6 +104,13 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object,
 
                 skRenderer_CreateDescriptorSetsForObject(
                     state->renderer, obj);
+
+                mat4 trans = GLM_MAT4_IDENTITY_INIT;
+                glm_translate(trans, object->position);
+                glm_quat_rotate(trans, object->rotation, trans);
+                glm_scale(trans, object->scale);
+
+                glm_mat4_copy(trans, obj->transform);
             }
         }
         if (object->type == skRenderObjectType_Sprite)
@@ -172,20 +180,23 @@ skJson skRenderAssociation_SaveComponent(skRenderAssociation* object)
     skJson_SaveInt(j, "type", object->type);
     skJson_SaveString(j, "modelPath", object->modelPath);
     skJson_SaveString(j, "texturePath", object->texturePath);
-    skJson_SaveString(j, "normalTexturePath", object->normalTexturePath);
+    skJson_SaveString(j, "normalTexturePath",
+                      object->normalTexturePath);
     skJson_SaveFloat3(j, "position", object->position);
     skJson_SaveFloat4(j, "rotation", object->rotation);
     skJson_SaveFloat3(j, "scale", object->scale);
     return j;
 }
 
-void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
+void skRenderAssociation_LoadComponent(skRenderAssociation* object,
+                                       skJson               j)
 {
     skJson_LoadInt(j, "objectIndex", &object->objectIndex);
     skJson_LoadInt(j, "type", &object->type);
     skJson_LoadString(j, "modelPath", object->modelPath);
     skJson_LoadString(j, "texturePath", object->texturePath);
-    skJson_LoadString(j, "normalTexturePath", object->normalTexturePath);
+    skJson_LoadString(j, "normalTexturePath",
+                      object->normalTexturePath);
     skJson_LoadFloat3(j, "position", object->position);
     skJson_LoadFloat4(j, "rotation", object->rotation);
     skJson_LoadFloat3(j, "scale", object->scale);
@@ -237,7 +248,8 @@ skJson skLightAssociation_SaveComponent(skLightAssociation* object)
     return j;
 }
 
-void skLightAssociation_LoadComponent(skLightAssociation* object, skJson j)
+void skLightAssociation_LoadComponent(skLightAssociation* object,
+                                      skJson              j)
 {
     skJson_LoadInt(j, "lightIndex", &object->lightIndex);
     skJson_LoadFloat3(j, "position", object->position);
@@ -255,20 +267,23 @@ void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
         skName_DrawComponent(skNameObj, state);
     }
 
-    skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+    skRenderAssociation* skRenderAssociationObj =
+        SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
     if (skRenderAssociationObj != NULL)
     {
-        skRenderAssociation_DrawComponent(skRenderAssociationObj, state);
+        skRenderAssociation_DrawComponent(skRenderAssociationObj,
+                                          state);
     }
 
-    skLightAssociation* skLightAssociationObj = SK_ECS_GET(state->scene, ent, skLightAssociation);
+    skLightAssociation* skLightAssociationObj =
+        SK_ECS_GET(state->scene, ent, skLightAssociation);
 
     if (skLightAssociationObj != NULL)
     {
-        skLightAssociation_DrawComponent(skLightAssociationObj, state);
+        skLightAssociation_DrawComponent(skLightAssociationObj,
+                                         state);
     }
-
 }
 
 skJson Micah_SaveAllComponents(skECSState* state)
@@ -278,7 +293,7 @@ skJson Micah_SaveAllComponents(skECSState* state)
     for (int i = 0; i < skECS_EntityCount(state->scene); i++)
     {
         skEntityID ent = skECS_GetEntityAtIndex(state->scene, i);
-        skJson entJson = skJson_Create();
+        skJson     entJson = skJson_Create();
 
         if (!skECS_IsEntityValid(ent))
         {
@@ -295,22 +310,28 @@ skJson Micah_SaveAllComponents(skECSState* state)
             skJson_Destroy(compJson);
         }
 
-        skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+        skRenderAssociation* skRenderAssociationObj =
+            SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
         if (skRenderAssociationObj != NULL)
         {
-            skJson compJson = skRenderAssociation_SaveComponent(skRenderAssociationObj);
-            skJson_SaveString(compJson, "componentType", "skRenderAssociation");
+            skJson compJson = skRenderAssociation_SaveComponent(
+                skRenderAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skRenderAssociation");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
 
-        skLightAssociation* skLightAssociationObj = SK_ECS_GET(state->scene, ent, skLightAssociation);
+        skLightAssociation* skLightAssociationObj =
+            SK_ECS_GET(state->scene, ent, skLightAssociation);
 
         if (skLightAssociationObj != NULL)
         {
-            skJson compJson = skLightAssociation_SaveComponent(skLightAssociationObj);
-            skJson_SaveString(compJson, "componentType", "skLightAssociation");
+            skJson compJson = skLightAssociation_SaveComponent(
+                skLightAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skLightAssociation");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
@@ -322,40 +343,47 @@ skJson Micah_SaveAllComponents(skECSState* state)
     return j;
 }
 
-
 void Micah_LoadAllComponents(skECSState* state, skJson j)
 {
     int entityCount = skJson_GetArraySize(j);
 
     for (int i = 0; i < entityCount; i++)
     {
-        skJson entJson = skJson_GetArrayElement(j, i);
+        skJson     entJson = skJson_GetArrayElement(j, i);
         skEntityID ent = skECS_AddEntity(state->scene);
 
         int componentCount = skJson_GetArraySize(entJson);
 
-        for (int compIndex = 0; compIndex < componentCount; compIndex++)
+        for (int compIndex = 0; compIndex < componentCount;
+             compIndex++)
         {
-            skJson compJson = skJson_GetArrayElement(entJson, compIndex);
+            skJson compJson =
+                skJson_GetArrayElement(entJson, compIndex);
 
             char componentType[256];
-            skJson_LoadString(compJson, "componentType", componentType);
+            skJson_LoadString(compJson, "componentType",
+                              componentType);
 
             // Check component type and assign/load accordingly
-            if (false) {} // Dummy condition for cleaner generated code
+            if (false) {
+            } // Dummy condition for cleaner generated code
             else if (strcmp(componentType, "skName") == 0)
             {
-                skName* comp = SK_ECS_ASSIGN(state->scene, ent, skName);
+                skName* comp =
+                    SK_ECS_ASSIGN(state->scene, ent, skName);
                 skName_LoadComponent(comp, compJson);
             }
-            else if (strcmp(componentType, "skRenderAssociation") == 0)
+            else if (strcmp(componentType, "skRenderAssociation") ==
+                     0)
             {
-                skRenderAssociation* comp = SK_ECS_ASSIGN(state->scene, ent, skRenderAssociation);
+                skRenderAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skRenderAssociation);
                 skRenderAssociation_LoadComponent(comp, compJson);
             }
             else if (strcmp(componentType, "skLightAssociation") == 0)
             {
-                skLightAssociation* comp = SK_ECS_ASSIGN(state->scene, ent, skLightAssociation);
+                skLightAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skLightAssociation);
                 skLightAssociation_LoadComponent(comp, compJson);
             }
         }

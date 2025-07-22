@@ -50,7 +50,8 @@ typedef struct skUniformBufferObject
 
 typedef struct skGlobalUniformBufferObject
 {
-    int lightCount;
+    vec3 viewPos;
+    int  lightCount;
 } skGlobalUniformBufferObject;
 
 typedef struct skRenderer
@@ -85,6 +86,7 @@ typedef struct skRenderer
     VkImageView              depthImageView;
     VkDeviceMemory           depthImageMemory;
     mat4                     viewTransform;
+    vec3                     viewPos;
     skVector*                renderObjects; // skRenderObject
     skVector*                lights;        // skLight
 

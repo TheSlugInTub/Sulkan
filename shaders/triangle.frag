@@ -26,15 +26,16 @@ layout(std430, set = 1, binding = 0) readonly buffer LightBuffer {
 
 layout(set = 2, binding = 0) uniform skGlobalUniformBufferObject 
 {
+    vec3 viewPos;
     int lightCount;
 } gubo;
 
 void main() 
 {
-    vec3 cameraPos = vec3(2.0, 0.0, 1.0);
-
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
     vec3 ambient = 0.15 * baseColor;
+
+    float specularStrength = 0.5;
     
     vec3 norm = normalize(fragNormal);
     vec3 normal;
@@ -46,12 +47,23 @@ void main()
         normal = texture(normalSampler, fragTexCoord).rgb;
         normal = normalize(normal * 5.0 - 1.0);
 
-        vec3 lightDir = fragTBN * normalize(lights[i].position - fragWorldPos);
+        vec3 tangentViewPos = fragTBN * gubo.viewPos;
+        vec3 tangentLightPos = fragTBN * lights[i].position;
+        vec3 tangentFragPos = fragTBN * fragWorldPos;
+
+        vec3 viewDir = normalize(tangentViewPos - tangentFragPos);
+
+        vec3 lightDir = normalize(tangentLightPos - tangentFragPos);
+        vec3 reflectDir = reflect(-lightDir, normal);
+      
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 256);
+        vec3 specular = specularStrength * spec * lights[i].color;
+        
         float diff = max(dot(normal, lightDir), 0.0);
 
         vec3 diffuse = vec3(diff);
   
-        result += ((ambient + diffuse) * baseColor * lights[i].color) * 
+        result += ((ambient + diffuse + specular) * baseColor * lights[i].color) * 
             lights[i].intensity;
     }
 
