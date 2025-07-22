@@ -23,7 +23,7 @@ layout(location = 6) out mat3 fragTBN;
 void main() 
 {
     fragWorldPos = vec3(ubo.model * vec4(inPosition, 1.0));
-    fragNormal = mat3(transpose(inverse(ubo.model))) * inNormal;
+    fragNormal = normalize(mat3(transpose(inverse(ubo.model))) * inNormal);
     fragTexCoord = inTexCoord;
     fragTangent = inTangent;
     fragBitangent = inBitangent;

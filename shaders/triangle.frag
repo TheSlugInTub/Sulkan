@@ -35,18 +35,17 @@ void main()
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
     vec3 ambient = 0.15 * baseColor;
 
-    float specularStrength = 0.5;
+    float specularStrength = 2.5;
     
     vec3 norm = normalize(fragNormal);
-    vec3 normal;
+        
+    vec3 normal = texture(normalSampler, fragTexCoord).rgb;
+    normal = normalize(normal * 2.0 - 1.0);
 
     vec3 result = ambient;
 
     for (int i = 0; i < gubo.lightCount; i++)
     {
-        normal = texture(normalSampler, fragTexCoord).rgb;
-        normal = normalize(normal * 5.0 - 1.0);
-
         vec3 tangentViewPos = fragTBN * gubo.viewPos;
         vec3 tangentLightPos = fragTBN * lights[i].position;
         vec3 tangentFragPos = fragTBN * fragWorldPos;
@@ -63,7 +62,7 @@ void main()
 
         vec3 diffuse = vec3(diff);
   
-        result += ((ambient + diffuse + specular) * baseColor * lights[i].color) * 
+        result += ((diffuse + specular) * baseColor * lights[i].color) * 
             lights[i].intensity;
     }
 

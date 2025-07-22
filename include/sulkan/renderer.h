@@ -54,6 +54,33 @@ typedef struct skGlobalUniformBufferObject
     int  lightCount;
 } skGlobalUniformBufferObject;
 
+typedef struct skRenderObject
+{
+    VkBuffer       vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer       indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    VkImage        textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView    textureImageView;
+    VkSampler      textureSampler;
+
+    VkImage        normalImage;
+    VkDeviceMemory normalImageMemory;
+    VkImageView    normalImageView;
+    VkSampler      normalSampler;
+
+    u32 indexCount;
+
+    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
+
+    mat4 transform;
+} skRenderObject;
+
 typedef struct skRenderer
 {
     skWindow*                window;
@@ -72,6 +99,8 @@ typedef struct skRenderer
     VkRenderPass             renderPass;
     VkPipelineLayout         pipelineLayout;
     VkPipeline               pipeline;
+    VkPipelineLayout         skyboxPipelineLayout;
+    VkPipeline               skyboxPipeline;
     VkCommandPool            commandPool;
     skVector*                commandBuffers; // VkCommandBuffer
     skVector*                imageAvailableSemaphores; // VkSemaphore
@@ -89,6 +118,8 @@ typedef struct skRenderer
     vec3                     viewPos;
     skVector*                renderObjects; // skRenderObject
     skVector*                lights;        // skLight
+
+    skRenderObject skyboxObject;
 
     VkDescriptorSet lightDescriptorSets[SK_FRAMES_IN_FLIGHT];
     VkBuffer        storageBuffers[SK_FRAMES_IN_FLIGHT];
@@ -204,33 +235,6 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer);
 void skRenderer_CreateDescriptorSets(skRenderer* renderer);
 void skRenderer_CreateDescriptorPool(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
-
-typedef struct skRenderObject
-{
-    VkBuffer       vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer       indexBuffer;
-    VkDeviceMemory indexBufferMemory;
-
-    VkImage        textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView    textureImageView;
-    VkSampler      textureSampler;
-
-    VkImage        normalImage;
-    VkDeviceMemory normalImageMemory;
-    VkImageView    normalImageView;
-    VkSampler      normalSampler;
-
-    u32 indexCount;
-
-    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
-    VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
-    VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
-    void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
-
-    mat4 transform;
-} skRenderObject;
 
 skRenderObject
 skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,

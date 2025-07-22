@@ -637,6 +637,198 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     }
 }
 
+void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
+{
+    u32   vertLen, fragLen;
+    char* vertShaderCode =
+        skReadFile("shaders/skybox_vert.spv", &vertLen);
+    char* fragShaderCode =
+        skReadFile("shaders/skybox_frag.spv", &fragLen);
+
+    VkShaderModule vertMod =
+        skCreateShaderModule(renderer, vertShaderCode, vertLen);
+    VkShaderModule fragMod =
+        skCreateShaderModule(renderer, fragShaderCode, fragLen);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {0};
+    vertShaderStageInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+    vertShaderStageInfo.module = vertMod;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {0};
+    fragShaderStageInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragMod;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        vertShaderStageInfo, fragShaderStageInfo};
+
+    VkVertexInputBindingDescription bindingDescription =
+        skVertex_GetBindingDescription();
+    VkVertexInputAttributeDescriptions attributeDescriptions =
+        skVertex_GetAttributeDescription();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
+    vertexInputInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = 5;
+    vertexInputInfo.pVertexAttributeDescriptions =
+        attributeDescriptions.descriptions;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+
+    VkDynamicState dynamicStates[2] = {VK_DYNAMIC_STATE_VIEWPORT,
+                                       VK_DYNAMIC_STATE_SCISSOR};
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {0};
+    dynamicState.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
+    inputAssembly.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport = {0};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)renderer->swapchainExtent.width;
+    viewport.height = (float)renderer->swapchainExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor = {0};
+    scissor.offset = (VkOffset2D) {0, 0};
+    scissor.extent = renderer->swapchainExtent;
+
+    VkPipelineViewportStateCreateInfo viewportState = {0};
+    viewportState.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = {0};
+    rasterizer.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 0.0f;
+    rasterizer.depthBiasClamp = 0.0f;
+    rasterizer.depthBiasSlopeFactor = 0.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling = {0};
+    multisampling.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f;
+    multisampling.pSampleMask = NULL;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor =
+        VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor =
+        VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {0};
+    colorBlending.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.blendConstants[0] = 0.0f;
+    colorBlending.blendConstants[1] = 0.0f;
+    colorBlending.blendConstants[2] = 0.0f;
+    colorBlending.blendConstants[3] = 0.0f;
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    pipelineLayoutInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 3;
+    VkDescriptorSetLayout layouts[] = { renderer->descriptorSetLayout, 
+                                        renderer->lightDescriptorSetLayout,
+                                        renderer->uniformDescriptorSetLayout};
+    pipelineLayoutInfo.pSetLayouts = layouts;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = NULL;
+
+    if (vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo,
+                               NULL, &renderer->skyboxPipelineLayout) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create pipeline layout.\n");
+    }
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = {0};
+    pipelineInfo.sType =
+        VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+
+    pipelineInfo.layout = renderer->skyboxPipelineLayout;
+
+    pipelineInfo.renderPass = renderer->renderPass;
+    pipelineInfo.subpass = 0;
+
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
+    depthStencil.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.front = (VkStencilOpState) {0};
+    depthStencil.back = (VkStencilOpState) {0};
+
+    pipelineInfo.pDepthStencilState = &depthStencil;
+
+    if (vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1,
+                                  &pipelineInfo, NULL,
+                                  &renderer->skyboxPipeline) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create graphics pipeline.\n");
+    }
+}
+
 Bool skRenderer_CheckExtensionsSupported(VkPhysicalDevice device)
 {
     u32 extensionCount;
@@ -955,6 +1147,29 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
     }
+    
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      renderer->skyboxPipeline);
+
+    // Bind vertex and index buffers for skybox
+    VkBuffer     vertexBuffers[] = {renderer->skyboxObject.vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
+                           offsets);
+    vkCmdBindIndexBuffer(commandBuffer, renderer->skyboxObject.indexBuffer, 0,
+                         VK_INDEX_TYPE_UINT32);
+
+    VkDescriptorSet sets[] = {renderer->skyboxObject.descriptorSets[renderer->currentFrame], 
+                        renderer->lightDescriptorSets[renderer->currentFrame],
+                        renderer->uniformDescriptorSets[renderer->currentFrame]};
+
+    vkCmdBindDescriptorSets(
+        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        renderer->skyboxPipelineLayout, 0, 3,
+        sets, 0, NULL);
+
+    // Draw the skybox
+    vkCmdDrawIndexed(commandBuffer, renderer->skyboxObject.indexCount, 1, 0, 0, 0);
 
     if (editor != NULL)
     {
@@ -1252,6 +1467,22 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 
     memcpy(renderer->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(skGlobalUniformBufferObject));
+
+    skUniformBufferObject skyboxUbo = {0};
+    glm_mat4_copy(renderer->skyboxObject.transform, skyboxUbo.model);
+    
+    glm_mat4_copy(renderer->viewTransform, skyboxUbo.view);
+    
+    // Projection (same as regular objects)
+    mat4 proj;
+    glm_perspective(glm_rad(80.0f), 
+                   renderer->swapchainExtent.width / (float)renderer->swapchainExtent.height,
+                   0.001f, 100.0f, proj);
+    proj[1][1] *= -1.0f;
+    glm_mat4_copy(proj, skyboxUbo.proj);
+    
+    memcpy(renderer->skyboxObject.uniformBuffersMap[renderer->currentFrame], 
+           &skyboxUbo, sizeof(skyboxUbo));
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
@@ -2106,6 +2337,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateRenderPass(&renderer);
     skRenderer_CreateDescriptorSetLayout(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
+    skRenderer_CreateSkyboxGraphicsPipeline(&renderer);
     skRenderer_CreateCommandPool(&renderer);
     skRenderer_CreateDepthResources(&renderer);
     skRenderer_CreateFramebuffers(&renderer);
@@ -2113,6 +2345,38 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateDescriptorSets(&renderer);
     skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
+    
+    skModel model = skModel_Create();
+    skModel_Load(&model, "res/models/sphere.fbx");
+
+    renderer.skyboxObject = skRenderObject_CreateFromModel(&renderer, &model,
+                                         "res/textures/skybox.bmp", 
+                                         "res/textures/normal.bmp");
+    
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        skRenderer_CreateBuffer(
+            &renderer, sizeof(skUniformBufferObject), 
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &renderer.skyboxObject.uniformBuffers[frame],
+            &renderer.skyboxObject.uniformBuffersMemory[frame]);
+
+        vkMapMemory(renderer.device,
+                    renderer.skyboxObject.uniformBuffersMemory[frame], 0,
+                    sizeof(skUniformBufferObject), 0, 
+                    &renderer.skyboxObject.uniformBuffersMap[frame]);
+    }
+    
+    skRenderer_CreateDescriptorSetsForObject(&renderer, &renderer.skyboxObject);
+    
+    mat4 trans = GLM_MAT4_IDENTITY_INIT;
+    glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
+    glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
+    glm_scale(trans, (vec3) {100.0f, 100.0f, 100.0f});
+
+    glm_mat4_copy(trans, renderer.skyboxObject.transform);
 
     return renderer;
 }
