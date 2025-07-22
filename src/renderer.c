@@ -1428,7 +1428,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         glm_perspective(glm_rad(80.0f),
                         renderer->swapchainExtent.width /
                             (float)renderer->swapchainExtent.height,
-                        0.001f, 100.0f, proj);
+                        0.001f, 1000.0f, proj);
         proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
@@ -1477,7 +1477,7 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     mat4 proj;
     glm_perspective(glm_rad(80.0f), 
                    renderer->swapchainExtent.width / (float)renderer->swapchainExtent.height,
-                   0.001f, 100.0f, proj);
+                   0.001f, 1000.0f, proj);
     proj[1][1] *= -1.0f;
     glm_mat4_copy(proj, skyboxUbo.proj);
     

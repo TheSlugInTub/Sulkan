@@ -33,38 +33,6 @@ layout(set = 2, binding = 0) uniform skGlobalUniformBufferObject
 void main() 
 {
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
-    vec3 ambient = 0.15 * baseColor;
 
-    float specularStrength = 2.5;
-    
-    vec3 norm = normalize(fragNormal);
-        
-    vec3 normal = texture(normalSampler, fragTexCoord).rgb;
-    normal = normalize(normal * 2.0 - 1.0);
-
-    vec3 result = ambient;
-
-    for (int i = 0; i < gubo.lightCount; i++)
-    {
-        vec3 tangentViewPos = fragTBN * gubo.viewPos;
-        vec3 tangentLightPos = fragTBN * lights[i].position;
-        vec3 tangentFragPos = fragTBN * fragWorldPos;
-
-        vec3 viewDir = normalize(tangentViewPos - tangentFragPos);
-
-        vec3 lightDir = normalize(tangentLightPos - tangentFragPos);
-        vec3 reflectDir = reflect(-lightDir, normal);
-      
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 256);
-        vec3 specular = specularStrength * spec * lights[i].color;
-        
-        float diff = max(dot(normal, lightDir), 0.0);
-
-        vec3 diffuse = vec3(diff);
-  
-        result += ((diffuse + specular) * baseColor * lights[i].color) * 
-            lights[i].intensity;
-    }
-
-    outColor = vec4(result, 1.0);
+    outColor = vec4(baseColor, 1.0);
 }
