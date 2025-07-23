@@ -3,8 +3,6 @@
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragWorldPos;
 layout(location = 3) in vec3 fragNormal;
-layout(location = 4) in vec3 fragTangent;
-layout(location = 5) in vec3 fragBitangent;
 layout(location = 6) in mat3 fragTBN;
 
 layout(location = 0) out vec4 outColor;
@@ -35,7 +33,7 @@ void main()
     vec3 baseColor = texture(texSampler, fragTexCoord).rgb;
     vec3 ambient = 0.15 * baseColor;
 
-    float specularStrength = 2.5;
+    float specularStrength = 0.35;
     
     vec3 norm = normalize(fragNormal);
         
@@ -55,14 +53,14 @@ void main()
         vec3 lightDir = normalize(tangentLightPos - tangentFragPos);
         vec3 reflectDir = reflect(-lightDir, normal);
       
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 256);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
         vec3 specular = specularStrength * spec * lights[i].color;
         
         float diff = max(dot(normal, lightDir), 0.0);
 
-        vec3 diffuse = vec3(diff);
+        vec3 diffuse = vec3(diff) * baseColor;
   
-        result += ((diffuse + specular) * baseColor * lights[i].color) * 
+        result += ((diffuse + specular) * lights[i].color) * 
             lights[i].intensity;
     }
 

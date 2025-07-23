@@ -37,10 +37,10 @@
         {
             "componentType": "skRenderAssociation",
             "modelPath": "res/models/room.fbx",
-            "normalTexturePath": "",
+            "normalTexturePath": "res/textures/default_normal.bmp",
             "objectIndex": 1,
             "position": [
-                0.699999988079071,
+                0.6990000009536743,
                 0.0,
                 0.0
             ],
@@ -62,73 +62,21 @@
     [
         {
             "componentType": "skName",
-            "name": "Ent"
-        },
-        {
-            "componentType": "skRenderAssociation",
-            "modelPath": "",
-            "normalTexturePath": "",
-            "objectIndex": 2,
-            "position": [
-                0.0,
-                1.2000000476837158,
-                0.0
-            ],
-            "rotation": [
-                0.0,
-                0.0,
-                0.0,
-                0.0
-            ],
-            "scale": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "texturePath": "res/textures/image.bmp",
-            "type": 1
-        }
-    ],
-    [
-        {
-            "componentType": "skName",
             "name": "LightAssoc"
         },
         {
             "color": [
                 1.0,
-                0.0,
+                1.0,
                 1.0
             ],
             "componentType": "skLightAssociation",
             "intensity": 1.0,
             "lightIndex": 0,
             "position": [
-                -17.336999893188477,
-                1.399999976158142,
-                9.699999809265137
-            ],
-            "radius": 1.0
-        }
-    ],
-    [
-        {
-            "componentType": "skName",
-            "name": "Entity"
-        },
-        {
-            "color": [
-                0.08299999684095383,
-                0.40799999237060547,
-                1.0
-            ],
-            "componentType": "skLightAssociation",
-            "intensity": 2.8350000381469727,
-            "lightIndex": 1,
-            "position": [
-                15.899999618530273,
-                0.0,
-                13.600000381469727
+                2.0429999828338623,
+                2.799999952316284,
+                1.0920000076293945
             ],
             "radius": 1.0
         }
@@ -141,12 +89,12 @@
         {
             "componentType": "skRenderAssociation",
             "modelPath": "res/models/box.fbx",
-            "normalTexturePath": "",
-            "objectIndex": 3,
+            "normalTexturePath": "res/textures/brickwall_normal.bmp",
+            "objectIndex": 2,
             "position": [
-                -0.30000001192092896,
-                1.7000000476837158,
-                0.4000000059604645
+                1.0260000228881836,
+                0.0,
+                0.47600001096725464
             ],
             "rotation": [
                 0.0,
@@ -159,7 +107,7 @@
                 0.20000000298023224,
                 0.20000000298023224
             ],
-            "texturePath": "res/textures/concrete.bmp",
+            "texturePath": "res/textures/brickwall.bmp",
             "type": 0
         }
     ]
