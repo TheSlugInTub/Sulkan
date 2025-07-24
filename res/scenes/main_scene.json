@@ -74,9 +74,9 @@
             "intensity": 1.0,
             "lightIndex": 0,
             "position": [
-                2.0429999828338623,
-                2.799999952316284,
-                1.0920000076293945
+                -0.5569999814033508,
+                0.5,
+                0.5920000076293945
             ],
             "radius": 1.0
         }
@@ -88,7 +88,7 @@
         },
         {
             "componentType": "skRenderAssociation",
-            "modelPath": "res/models/box.fbx",
+            "modelPath": "res/models/sphere.fbx",
             "normalTexturePath": "res/textures/brickwall_normal.bmp",
             "objectIndex": 2,
             "position": [
