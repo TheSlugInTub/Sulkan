@@ -20,6 +20,7 @@
                 0.0,
                 0.0
             ],
+            "roughnessTexturePath": "",
             "scale": [
                 1.0,
                 1.0,
@@ -50,6 +51,7 @@
                 0.0,
                 0.0
             ],
+            "roughnessTexturePath": "",
             "scale": [
                 1.0,
                 1.0,
@@ -72,7 +74,7 @@
             ],
             "componentType": "skLightAssociation",
             "intensity": 1.0,
-            "lightIndex": 0,
+            "lightIndex": 1,
             "position": [
                 -0.5569999814033508,
                 0.5,
@@ -102,6 +104,7 @@
                 0.0,
                 0.0
             ],
+            "roughnessTexturePath": "",
             "scale": [
                 0.20000000298023224,
                 0.20000000298023224,

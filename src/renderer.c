@@ -1919,15 +1919,24 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     normalLayoutBinding.pImmutableSamplers = NULL;
     normalLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    VkDescriptorSetLayoutBinding roughnessLayoutBinding = {0};
+    roughnessLayoutBinding.binding = 3;
+    roughnessLayoutBinding.descriptorCount = 1;
+    roughnessLayoutBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    roughnessLayoutBinding.pImmutableSamplers = NULL;
+    roughnessLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
                                                samplerLayoutBinding,
-                                               normalLayoutBinding};
+                                               normalLayoutBinding,
+                                               roughnessLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 4;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(
@@ -2196,8 +2205,14 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         normalImageInfo.imageView = obj->normalImageView;
         normalImageInfo.sampler = obj->normalSampler;
+        
+        VkDescriptorImageInfo roughnessImageInfo = {0};
+        roughnessImageInfo.imageLayout =
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        roughnessImageInfo.imageView = obj->roughnessImageView;
+        roughnessImageInfo.sampler = obj->roughnessSampler;
 
-        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}, {0}};
+        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}, {0}, {0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = obj->descriptorSets[frame];
@@ -2227,8 +2242,18 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pImageInfo = &normalImageInfo;
+        
+        descriptorWrites[3].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = obj->descriptorSets[frame];
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType =
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pImageInfo = &roughnessImageInfo;
 
-        vkUpdateDescriptorSets(renderer->device, 3, descriptorWrites,
+        vkUpdateDescriptorSets(renderer->device, 4, descriptorWrites,
                                0, NULL);
     }
 }
@@ -2356,7 +2381,8 @@ skRenderer skRenderer_Create(skWindow* window)
 
     renderer.skyboxObject = skRenderObject_CreateFromModel(&renderer, &model,
                                          "res/textures/skybox.bmp", 
-                                         "res/textures/normal.bmp");
+                                         "res/textures/defualt_normal.bmp",
+                                         "res/textures/default_roughness.bmp");
     
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
@@ -2496,7 +2522,8 @@ void skRenderer_CreateTexture(skRenderer* renderer,
 skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
                                               skModel*    model,
                                               const char* texturePath,
-                                              const char* normalTexturePath)
+                                              const char* normalTexturePath,
+                                              const char* roughnessTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2665,6 +2692,8 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
 
     glm_mat4_identity(obj.transform);
     
+    {
+
     int      texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
                                 &texChannels, STBI_rgb_alpha);
@@ -2750,13 +2779,105 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
         printf("SK ERROR: Failed to create normal sampler.");
     }
 
+    }
+    
+    {
+
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(roughnessTexturePath, &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load roughness texture image.");
+        pixels = stbi_load("res/textures/default_roughness.bmp", &texWidth, &texHeight,
+                           &texChannels, STBI_rgb_alpha);
+    }
+    
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
+        &obj.roughnessImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.roughnessImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    obj.roughnessImageView = skRenderer_CreateImageView(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &obj.roughnessSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create normal sampler.");
+    }
+
+    }
+
     return obj;
 }
 
 skRenderObject
 skRenderObject_CreateFromSprite(skRenderer* renderer,
                                 const char* texturePath,
-                                const char* normalTexturePath)
+                                const char* normalTexturePath,
+                                const char* roughnessTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2927,6 +3048,8 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
     glm_mat4_identity(obj.transform);
 
     }
+
+    {
     
     int      texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
@@ -3011,6 +3134,97 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
                         &obj.normalSampler) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create normal sampler.");
+    }
+
+    }
+    
+    {
+
+    int      texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(roughnessTexturePath, &texWidth, &texHeight,
+                                &texChannels, STBI_rgb_alpha);
+
+    if (!pixels)
+    {
+        printf("SK ERROR: Failed to load roughness texture image.");
+        pixels = stbi_load("res/textures/default_roughness.bmp", &texWidth, &texHeight,
+                           &texChannels, STBI_rgb_alpha);
+    }
+    
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    VkBuffer       imageStagingBuffer;
+    VkDeviceMemory imageStagingBufferMemory;
+
+    skRenderer_CreateBuffer(
+        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &imageStagingBuffer, &imageStagingBufferMemory);
+
+    void* imageData;
+    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                imageSize, 0, &imageData);
+    memcpy(imageData, pixels, imageSize);
+    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    skRenderer_CreateImage(
+        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
+        &obj.roughnessImageMemory);
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                 obj.roughnessImage, (u32)(texWidth),
+                                 (u32)(texHeight));
+
+    skRenderer_TransitionImageLayout(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    obj.roughnessImageView = skRenderer_CreateImageView(
+        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkSamplerCreateInfo samplerInfo = {0};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 0;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                        &obj.roughnessSampler) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create normal sampler.");
+    }
+
     }
 
     return obj;

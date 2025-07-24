@@ -13,13 +13,15 @@ void skRenderAssociation_CreateRenderObject(
 
         obj = skRenderObject_CreateFromModel(state->renderer, &model,
                                              assoc->texturePath, 
-                                             assoc->normalTexturePath);
+                                             assoc->normalTexturePath,
+                                             assoc->roughnessTexturePath);
     }
     else if (assoc->type == skRenderObjectType_Sprite)
     {
         obj = skRenderObject_CreateFromSprite(state->renderer,
                                               assoc->texturePath,
-                                              assoc->normalTexturePath);
+                                              assoc->normalTexturePath,
+                                              assoc->roughnessTexturePath);
     }
 
     mat4 trans = GLM_MAT4_IDENTITY_INIT;

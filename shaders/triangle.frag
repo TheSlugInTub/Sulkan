@@ -1,4 +1,3 @@
-
 #version 450
 
 layout(location = 1) in vec2 fragTexCoord;
@@ -10,6 +9,7 @@ layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
 layout(set = 0, binding = 2) uniform sampler2D normalSampler;
+layout(set = 0, binding = 3) uniform sampler2D roughnessSampler;
 
 struct skLight 
 {
@@ -75,7 +75,7 @@ void main()
 {
     vec3 baseColor = pow(texture(texSampler, fragTexCoord).rgb, vec3(2.2));
 
-    float roughness = 0.2;
+    float roughness = texture(roughnessSampler, fragTexCoord).r;
     float metallic = 0.0;
     
     vec3 norm = normalize(fragNormal);
@@ -99,7 +99,7 @@ void main()
 
         float dist = length(tangentLightPos - tangentFragPos);
         float attenuation = 1.0 / (dist * dist);
-        vec3 radiance     = lights[i].color * attenuation;
+        vec3 radiance     = lights[i].color * lights[i].intensity * attenuation;
       
         vec3 F0 = vec3(0.04); 
         F0      = mix(F0, baseColor, metallic);

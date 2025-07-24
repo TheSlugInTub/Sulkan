@@ -71,6 +71,11 @@ typedef struct skRenderObject
     VkImageView    normalImageView;
     VkSampler      normalSampler;
 
+    VkImage        roughnessImage;
+    VkDeviceMemory roughnessImageMemory;
+    VkImageView    roughnessImageView;
+    VkSampler      roughnessSampler;
+
     u32 indexCount;
 
     VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
@@ -236,14 +241,14 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer);
 void skRenderer_CreateDescriptorPool(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
 
-skRenderObject
-skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
-                               const char* texturePath,
-                               const char* normalTexturePath);
+skRenderObject skRenderObject_CreateFromModel(
+    skRenderer* renderer, skModel* model, const char* texturePath,
+    const char* normalTexturePath, const char* roughnessTexturePath);
 skRenderObject
      skRenderObject_CreateFromSprite(skRenderer* renderer,
                                      const char* texturePath,
-                                     const char* normalTexturePath);
+                                     const char* normalTexturePath,
+                                     const char* roughnessTexturePath);
 void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
                                               skRenderObject* obj);
 void skRenderer_AddRenderObject(skRenderer*     renderer,
