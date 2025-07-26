@@ -1142,20 +1142,25 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         {
             for (int i = 0; i < 100; i++)
             {
-                mat4* mat = (mat4*)skVector_Get(obj->boneTransforms, i);
+                mat4* mat =
+                    (mat4*)skVector_Get(obj->boneTransforms, i);
                 memcpy(
-                    renderer->boneBuffersMap[renderer->currentFrame], mat,
-                    sizeof(mat4));
+                    (char*)renderer
+                            ->boneBuffersMap[renderer->currentFrame] +
+                        (i * sizeof(mat4)),
+                    mat, sizeof(mat4));
             }
         }
-        else 
+        else
         {
             for (int i = 0; i < 100; i++)
             {
                 mat4 mat = GLM_MAT4_IDENTITY_INIT;
                 memcpy(
-                    renderer->boneBuffersMap[renderer->currentFrame], &mat,
-                    sizeof(mat4));
+                    (char*)renderer
+                            ->boneBuffersMap[renderer->currentFrame] +
+                        (i * sizeof(mat4)),
+                    &mat, sizeof(mat4));
             }
         }
 
@@ -2262,7 +2267,7 @@ void skRenderer_AddLight(skRenderer* renderer, skLight* light)
 
 void skRenderer_CreateDescriptorPool(skRenderer* renderer)
 {
-    VkDescriptorPoolSize poolSizes[] = {{0}, {0}, {0}};
+    VkDescriptorPoolSize poolSizes[] = {{0}, {0}, {0}, {0}};
 
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount =
@@ -2274,12 +2279,14 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer)
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount =
         SK_MAX_LIGHTS * SK_FRAMES_IN_FLIGHT;
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[3].descriptorCount = SK_MAX_BONES * SK_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.flags =
         VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.poolSizeCount = 3;
+    poolInfo.poolSizeCount = 4;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = (SK_FRAMES_IN_FLIGHT * SK_MAX_RENDER_OBJECTS) +
                        SK_FRAMES_IN_FLIGHT;

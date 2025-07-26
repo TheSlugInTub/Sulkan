@@ -206,14 +206,11 @@ skAnimator skAnimator_Create(skAnimation* animation)
     anim.currentTime = 0.0f;
     anim.currentAnimation = animation;
     
-    anim.finalBoneMatrices = skVector_Create(sizeof(mat4), 10);
-
-    skVector_Resize(anim.finalBoneMatrices, 100);
+    anim.finalBoneMatrices = skVector_Create(sizeof(mat4), 100);
 
     for (int i = 0; i < 100; i++)
     {
-        mat4* trans = (mat4*)skVector_Get(anim.finalBoneMatrices, i);
-        glm_mat4_identity(*trans);
+        skVector_PushBack(anim.finalBoneMatrices, GLM_MAT4_IDENTITY);
     }
 
     return anim;
@@ -272,7 +269,10 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
 
         mat4* boneMat =
             (mat4*)skVector_Get(animator->finalBoneMatrices, index);
+        mat4 bruhMat;
         glm_mat4_mul(globalTransformation, info->offset, *boneMat);
+        glm_mat4_mul(globalTransformation, info->offset, bruhMat);
+        printf("MAT: %f, %f, %f, %f\n", bruhMat[0][0], bruhMat[1][0], bruhMat[2][0], bruhMat[3][0]);
     }
 
     for (int i = 0; i < node->childrenCount; i++)

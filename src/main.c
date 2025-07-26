@@ -43,15 +43,17 @@ int main(int argc, char** argv)
     mat4 trans = GLM_MAT4_IDENTITY_INIT;
     glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
     glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
-    glm_scale(trans, (vec3) {1.0f, 1.0f, 1.0f});
+    glm_scale(trans, (vec3) {0.01f, 0.01f, 0.01f});
 
     glm_mat4_copy(trans, obj.transform);
-
-    skRenderer_AddRenderObject(&renderer, &obj);
-
+    
     skAnimation anim = skAnimation_Create("res/models/dancing_vampire.dae", &model);
 
     skAnimator animator = skAnimator_Create(&anim);
+
+    obj.boneTransforms = animator.finalBoneMatrices;
+
+    skRenderer_AddRenderObject(&renderer, &obj);
 
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
