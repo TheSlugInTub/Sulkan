@@ -211,7 +211,8 @@ void skBone_InterpolateScale(skBone* bone, float animationTime,
 
 void skBone_Update(skBone* bone, float animationTime)
 {
-    mat4 trans, rotation, scale;
+    mat4 trans = GLM_MAT4_IDENTITY_INIT, rotation = GLM_MAT4_IDENTITY_INIT,
+         scale = GLM_MAT4_IDENTITY_INIT;
     skBone_InterpolatePosition(bone, animationTime, trans);
     skBone_InterpolateRotation(bone, animationTime, rotation);
     skBone_InterpolateScale(bone, animationTime, scale);
