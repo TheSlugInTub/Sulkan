@@ -71,7 +71,7 @@ int skBone_GetPositionIndex(skBone* bone, float animationTime)
     for (int index = 0; index < bone->numPositions - 1; ++index)
     {
         skKeyScale* scale =
-            (skKeyScale*)skVector_Get(bone->scales, index + 1);
+            (skKeyScale*)skVector_Get(bone->positions, index + 1);
 
         if (animationTime < scale->timeStamp)
             return index;
@@ -149,7 +149,7 @@ void skBone_InterpolatePosition(skBone* bone, float animationTime,
 void skBone_InterpolateRotation(skBone* bone, float animationTime,
                                 mat4 dest)
 {
-    if (bone->numPositions == 1)
+    if (bone->numRotations == 1)
     {
         skKeyRotation* rot =
             (skKeyRotation*)skVector_Get(bone->rotations, 0);
@@ -160,14 +160,14 @@ void skBone_InterpolateRotation(skBone* bone, float animationTime,
     int   p0Index = skBone_GetRotationIndex(bone, animationTime);
     int   p1Index = p0Index + 1;
     float scaleFactor = skGetScaleFactor(
-        ((skKeyPosition*)skVector_Get(bone->rotations, p0Index))
+        ((skKeyRotation*)skVector_Get(bone->rotations, p0Index))
             ->timeStamp,
-        ((skKeyPosition*)skVector_Get(bone->rotations, p1Index))
+        ((skKeyRotation*)skVector_Get(bone->rotations, p1Index))
             ->timeStamp,
         animationTime);
 
     vec4 finalRotation;
-    glm_vec4_lerp(
+    glm_quat_slerp(
         ((skKeyRotation*)skVector_Get(bone->rotations, p0Index))
             ->rotation,
         ((skKeyRotation*)skVector_Get(bone->rotations, p1Index))
@@ -181,7 +181,7 @@ void skBone_InterpolateRotation(skBone* bone, float animationTime,
 void skBone_InterpolateScale(skBone* bone, float animationTime,
                                mat4 dest)
 {
-    if (bone->numPositions == 1)
+    if (bone->numScales == 1)
     {
         skKeyScale* scale =
             (skKeyScale*)skVector_Get(bone->scales, 0);
@@ -192,9 +192,9 @@ void skBone_InterpolateScale(skBone* bone, float animationTime,
     int   p0Index = skBone_GetScaleIndex(bone, animationTime);
     int   p1Index = p0Index + 1;
     float scaleFactor = skGetScaleFactor(
-        ((skKeyPosition*)skVector_Get(bone->scales, p0Index))
+        ((skKeyScale*)skVector_Get(bone->scales, p0Index))
             ->timeStamp,
-        ((skKeyPosition*)skVector_Get(bone->scales, p1Index))
+        ((skKeyScale*)skVector_Get(bone->scales, p1Index))
             ->timeStamp,
         animationTime);
 

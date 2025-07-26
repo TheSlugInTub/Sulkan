@@ -273,7 +273,9 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
         
         mat4* boneMat =
             (mat4*)skVector_Get(animator->finalBoneMatrices, index);
-        glm_mat4_copy(bruhMat, *boneMat);   
+        glm_mat4_copy(bruhMat, *boneMat);
+
+        glm_mat4_print(*boneMat, stdout);
     }
 
     for (int i = 0; i < node->childrenCount; i++)
