@@ -20,6 +20,8 @@ skAnimation skAnimation_Create(const char* animationPath,
     struct aiMatrix4x4 globalTransformation =
         scene->mRootNode->mTransformation;
     aiMatrix4Inverse(&globalTransformation);
+    skAssimpMat4ToGLM(&globalTransformation,
+                      animation.inverseGlobalTransformation);
 
     if (!scene || !scene->mRootNode || !scene->mNumAnimations)
     {
@@ -102,7 +104,7 @@ void skAnimation_ReadMissingBones(skAnimation*              animation,
     for (int i = 0; i < size; i++)
     {
         const struct aiNodeAnim* channel = aiAnim->mChannels[i];
-        char boneName[128];
+        char                     boneName[128];
         strcpy(boneName, channel->mNodeName.data);
         const char* boneNamePtr = boneName;
 
@@ -114,9 +116,6 @@ void skAnimation_ReadMissingBones(skAnimation*              animation,
             newBoneInfo.id = model->boneCount;
             glm_mat4_identity(newBoneInfo.offset);
 
-                        printf("\nname: %s\n", boneNamePtr);
-
-
             skMap_Insert(model->boneInfoMap, &boneNamePtr,
                          &newBoneInfo);
             model->boneCount++;
@@ -127,7 +126,8 @@ void skAnimation_ReadMissingBones(skAnimation*              animation,
             (skBoneInfo*)skMap_Get(model->boneInfoMap, &boneNamePtr);
 
         // Create bone object and add to animation
-        skBone bone = skBone_Create(boneNamePtr, boneInfo->id, channel);
+        skBone bone =
+            skBone_Create(boneNamePtr, boneInfo->id, channel);
         skVector_PushBack(animation->bones, &bone);
     }
 }
@@ -205,7 +205,7 @@ skAnimator skAnimator_Create(skAnimation* animation)
 
     anim.currentTime = 0.0f;
     anim.currentAnimation = animation;
-    
+
     anim.finalBoneMatrices = skVector_Create(sizeof(mat4), 100);
 
     for (int i = 0; i < 100; i++)
@@ -253,7 +253,7 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
         skBone_Update(bone, animator->currentTime);
         glm_mat4_copy(bone->localTransform, node->transformation);
     }
-        
+
     mat4 globalTransformation;
     glm_mat4_mul(parentTransform, node->transformation,
                  globalTransformation);
@@ -270,19 +270,19 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
 
         mat4 bruhMat;
         glm_mat4_mul(globalTransformation, info->offset, bruhMat);
-        
+
         mat4* boneMat =
             (mat4*)skVector_Get(animator->finalBoneMatrices, index);
         glm_mat4_copy(bruhMat, *boneMat);
-
-        glm_mat4_print(*boneMat, stdout);
     }
 
     for (int i = 0; i < node->childrenCount; i++)
     {
-        skAssimpNodeData* nodeData = (skAssimpNodeData*)skVector_Get(node->children, i);
+        skAssimpNodeData* nodeData =
+            (skAssimpNodeData*)skVector_Get(node->children, i);
 
         skAnimator_CalculateBoneTransform(
-            animator, nodeData, globalTransformation);
+            animator, nodeData,
+            globalTransformation);
     }
 }

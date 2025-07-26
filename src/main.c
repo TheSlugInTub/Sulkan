@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     mat4 trans = GLM_MAT4_IDENTITY_INIT;
     glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
     glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
-    glm_scale(trans, (vec3) {0.01f, 0.01f, 0.01f});
+    glm_scale(trans, (vec3) {0.001f, 0.001f, 0.001f});
 
     glm_mat4_copy(trans, obj.transform);
     

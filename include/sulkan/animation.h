@@ -21,6 +21,7 @@ typedef struct skAnimation
     float duration;
     int ticksPerSecond;
     skAssimpNodeData rootNode;
+    mat4 inverseGlobalTransformation;
 } skAnimation;
 
 skAnimation skAnimation_Create(const char* animationPath, skModel* model);

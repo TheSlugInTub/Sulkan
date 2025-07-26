@@ -42,10 +42,10 @@ skBone skBone_Create(const char* name, int ID,
             channel->mRotationKeys[rotationIndex].mValue;
         float timeStamp = channel->mRotationKeys[rotationIndex].mTime;
         skKeyRotation data;
-        data.rotation[0] = aiOrientation.x;
-        data.rotation[1] = aiOrientation.y;
-        data.rotation[2] = aiOrientation.z;
-        data.rotation[3] = aiOrientation.w;
+        data.rotation[0] = aiOrientation.w;
+        data.rotation[1] = aiOrientation.x;
+        data.rotation[2] = aiOrientation.y;
+        data.rotation[3] = aiOrientation.z;
         data.timeStamp = timeStamp;
 
         skVector_PushBack(bone.rotations, &data);
@@ -70,10 +70,10 @@ int skBone_GetPositionIndex(skBone* bone, float animationTime)
 {
     for (int index = 0; index < bone->numPositions - 1; ++index)
     {
-        skKeyScale* scale =
-            (skKeyScale*)skVector_Get(bone->positions, index + 1);
+        skKeyPosition* pos =
+            (skKeyPosition*)skVector_Get(bone->positions, index + 1);
 
-        if (animationTime < scale->timeStamp)
+        if (animationTime < pos->timeStamp)
             return index;
     }
     assert(0);
@@ -173,7 +173,6 @@ void skBone_InterpolateRotation(skBone* bone, float animationTime,
         ((skKeyRotation*)skVector_Get(bone->rotations, p1Index))
             ->rotation,
         scaleFactor, finalRotation);
-    glm_normalize(finalRotation);
 
     glm_quat_mat4(finalRotation, dest);
 }
@@ -217,5 +216,4 @@ void skBone_Update(skBone* bone, float animationTime)
     skBone_InterpolateRotation(bone, animationTime, rotation);
     skBone_InterpolateScale(bone, animationTime, scale);
     glm_mat4_mul(trans, rotation, bone->localTransform);
-    glm_mat4_mul(bone->localTransform, scale, bone->localTransform);
 }
