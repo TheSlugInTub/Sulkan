@@ -22,12 +22,12 @@ VkVertexInputBindingDescription skVertex_GetBindingDescription()
 
 typedef struct VkVertexInputAttributeDescriptions
 {
-    VkVertexInputAttributeDescription descriptions[5];
+    VkVertexInputAttributeDescription descriptions[7];
 } VkVertexInputAttributeDescriptions;
 
 VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
 {
-    VkVertexInputAttributeDescription descriptions[5] = {0};
+    VkVertexInputAttributeDescription descriptions[7] = {0};
 
     descriptions[0].binding = 0;
     descriptions[0].location = 0;
@@ -43,20 +43,31 @@ VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
     descriptions[2].location = 2;
     descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
     descriptions[2].offset = offsetof(skVertex, textureCoordinates);
-    
+
     descriptions[3].binding = 0;
     descriptions[3].location = 3;
     descriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
     descriptions[3].offset = offsetof(skVertex, tangent);
-    
+
     descriptions[4].binding = 0;
     descriptions[4].location = 4;
     descriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
     descriptions[4].offset = offsetof(skVertex, bitangent);
 
+    descriptions[5].binding = 0;
+    descriptions[5].location = 5;
+    descriptions[5].format = VK_FORMAT_R32G32B32A32_SINT;
+    descriptions[5].offset = offsetof(skVertex, boneIDs);
+
+    descriptions[6].binding = 0;
+    descriptions[6].location = 6;
+    descriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descriptions[6].offset = offsetof(skVertex, weights);
+
     VkVertexInputAttributeDescriptions pair = {
-        descriptions[0], descriptions[1], descriptions[2], 
-        descriptions[3], descriptions[4] };
+        descriptions[0], descriptions[1], descriptions[2],
+        descriptions[3], descriptions[4], descriptions[5],
+        descriptions[6]};
 
     return pair;
 }
@@ -448,10 +459,8 @@ void skRenderer_CreateSwapchain(skRenderer* renderer,
 void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
 {
     u32   vertLen, fragLen;
-    char* vertShaderCode =
-        skReadFile("shaders/vert.spv", &vertLen);
-    char* fragShaderCode =
-        skReadFile("shaders/frag.spv", &fragLen);
+    char* vertShaderCode = skReadFile("shaders/vert.spv", &vertLen);
+    char* fragShaderCode = skReadFile("shaders/frag.spv", &fragLen);
 
     VkShaderModule vertMod =
         skCreateShaderModule(renderer, vertShaderCode, vertLen);
@@ -485,7 +494,7 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     vertexInputInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = 5;
+    vertexInputInfo.vertexAttributeDescriptionCount = 7;
     vertexInputInfo.pVertexAttributeDescriptions =
         attributeDescriptions.descriptions;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
@@ -577,10 +586,12 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 3;
-    VkDescriptorSetLayout layouts[] = { renderer->descriptorSetLayout, 
-                                        renderer->lightDescriptorSetLayout,
-                                        renderer->uniformDescriptorSetLayout};
+    pipelineLayoutInfo.setLayoutCount = 4;
+    VkDescriptorSetLayout layouts[] = {
+        renderer->descriptorSetLayout,
+        renderer->lightDescriptorSetLayout,
+        renderer->uniformDescriptorSetLayout,
+        renderer->bonesDescriptorSetLayout};
     pipelineLayoutInfo.pSetLayouts = layouts;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = NULL;
@@ -677,7 +688,7 @@ void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
     vertexInputInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = 5;
+    vertexInputInfo.vertexAttributeDescriptionCount = 7;
     vertexInputInfo.pVertexAttributeDescriptions =
         attributeDescriptions.descriptions;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
@@ -770,16 +781,17 @@ void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
     pipelineLayoutInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 3;
-    VkDescriptorSetLayout layouts[] = { renderer->descriptorSetLayout, 
-                                        renderer->lightDescriptorSetLayout,
-                                        renderer->uniformDescriptorSetLayout};
+    VkDescriptorSetLayout layouts[] = {
+        renderer->descriptorSetLayout,
+        renderer->lightDescriptorSetLayout,
+        renderer->uniformDescriptorSetLayout};
     pipelineLayoutInfo.pSetLayouts = layouts;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = NULL;
 
-    if (vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo,
-                               NULL, &renderer->skyboxPipelineLayout) !=
-        VK_SUCCESS)
+    if (vkCreatePipelineLayout(
+            renderer->device, &pipelineLayoutInfo, NULL,
+            &renderer->skyboxPipelineLayout) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create pipeline layout.\n");
     }
@@ -821,9 +833,9 @@ void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
 
     pipelineInfo.pDepthStencilState = &depthStencil;
 
-    if (vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1,
-                                  &pipelineInfo, NULL,
-                                  &renderer->skyboxPipeline) != VK_SUCCESS)
+    if (vkCreateGraphicsPipelines(
+            renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL,
+            &renderer->skyboxPipeline) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create graphics pipeline.\n");
     }
@@ -1126,6 +1138,27 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         skRenderObject* obj =
             (skRenderObject*)skVector_Get(renderer->renderObjects, i);
 
+        if (obj->boneTransforms != NULL)
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                mat4* mat = (mat4*)skVector_Get(obj->boneTransforms, i);
+                memcpy(
+                    renderer->boneBuffersMap[renderer->currentFrame], mat,
+                    sizeof(mat4));
+            }
+        }
+        else 
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                mat4 mat = GLM_MAT4_IDENTITY_INIT;
+                memcpy(
+                    renderer->boneBuffersMap[renderer->currentFrame], &mat,
+                    sizeof(mat4));
+            }
+        }
+
         // Bind vertex and index buffers for this object
         VkBuffer     vertexBuffers[] = {obj->vertexBuffer};
         VkDeviceSize offsets[] = {0};
@@ -1134,42 +1167,46 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         vkCmdBindIndexBuffer(commandBuffer, obj->indexBuffer, 0,
                              VK_INDEX_TYPE_UINT32);
 
-        VkDescriptorSet sets[] = {obj->descriptorSets[renderer->currentFrame], 
-                            renderer->lightDescriptorSets[renderer->currentFrame],
-                            renderer->uniformDescriptorSets[renderer->currentFrame]};
+        VkDescriptorSet sets[] = {
+            obj->descriptorSets[renderer->currentFrame],
+            renderer->lightDescriptorSets[renderer->currentFrame],
+            renderer->uniformDescriptorSets[renderer->currentFrame],
+            renderer->boneDescriptorSets[renderer->currentFrame],
+        };
 
         // Bind descriptor set for this object
         vkCmdBindDescriptorSets(
             commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            renderer->pipelineLayout, 0, 3,
-            sets, 0, NULL);
+            renderer->pipelineLayout, 0, 4, sets, 0, NULL);
 
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
     }
-    
+
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       renderer->skyboxPipeline);
 
     // Bind vertex and index buffers for skybox
-    VkBuffer     vertexBuffers[] = {renderer->skyboxObject.vertexBuffer};
+    VkBuffer vertexBuffers[] = {renderer->skyboxObject.vertexBuffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
                            offsets);
-    vkCmdBindIndexBuffer(commandBuffer, renderer->skyboxObject.indexBuffer, 0,
+    vkCmdBindIndexBuffer(commandBuffer,
+                         renderer->skyboxObject.indexBuffer, 0,
                          VK_INDEX_TYPE_UINT32);
 
-    VkDescriptorSet sets[] = {renderer->skyboxObject.descriptorSets[renderer->currentFrame], 
-                        renderer->lightDescriptorSets[renderer->currentFrame],
-                        renderer->uniformDescriptorSets[renderer->currentFrame]};
+    VkDescriptorSet sets[] = {
+        renderer->skyboxObject.descriptorSets[renderer->currentFrame],
+        renderer->lightDescriptorSets[renderer->currentFrame],
+        renderer->uniformDescriptorSets[renderer->currentFrame]};
 
     vkCmdBindDescriptorSets(
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        renderer->skyboxPipelineLayout, 0, 3,
-        sets, 0, NULL);
+        renderer->skyboxPipelineLayout, 0, 3, sets, 0, NULL);
 
     // Draw the skybox
-    vkCmdDrawIndexed(commandBuffer, renderer->skyboxObject.indexCount, 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, renderer->skyboxObject.indexCount,
+                     1, 0, 0, 0);
 
     if (editor != NULL)
     {
@@ -1435,58 +1472,62 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(ubo));
     }
-  
-    char* mapped = (char*)renderer->storageBuffersMap[renderer->currentFrame];
-    
-    for (size_t i = 0; i < renderer->lights->size; i++) 
+
+    char* mapped =
+        (char*)renderer->storageBuffersMap[renderer->currentFrame];
+
+    for (size_t i = 0; i < renderer->lights->size; i++)
     {
         skLight* light = (skLight*)skVector_Get(renderer->lights, i);
-        char* dest = mapped + i * 48;  // Destination with padding
-    
+        char*    dest = mapped + i * 48; // Destination with padding
+
         // Copy position (12 bytes) + 4-byte padding
         memcpy(dest, &light->position, sizeof(vec3));
-        dest += 16;  // Advance 16 bytes (position + padding for 
-                     // Vulkan memory alignment for vec3s)
-    
+        dest += 16; // Advance 16 bytes (position + padding for
+                    // Vulkan memory alignment for vec3s)
+
         // Copy color (12 bytes) + 4-byte padding
         memcpy(dest, &light->color, sizeof(vec3));
 
         // I really don't know why I have to advance 12 bytes here
         // instead of 16 because if I do, the radius gets copied
         // to the intensity variable in the float
-        dest += 12;  // Advance 12 bytes
-    
+        dest += 12; // Advance 12 bytes
+
         memcpy(dest, &light->radius, sizeof(float));
         dest += sizeof(float);
 
         memcpy(dest, &light->intensity, sizeof(float));
     }
 
-    skGlobalUniformBufferObject ubo = {.lightCount = renderer->lights->size};
+    skGlobalUniformBufferObject ubo = {.lightCount =
+                                           renderer->lights->size};
     glm_vec3_copy(renderer->viewPos, ubo.viewPos);
 
     memcpy(renderer->uniformBuffersMap[renderer->currentFrame], &ubo,
-               sizeof(skGlobalUniformBufferObject));
+           sizeof(skGlobalUniformBufferObject));
 
     skUniformBufferObject skyboxUbo = {0};
     glm_mat4_copy(renderer->skyboxObject.transform, skyboxUbo.model);
-    
+
     mat4 viewNoTranslation;
     glm_mat4_copy(renderer->viewTransform, viewNoTranslation);
-    viewNoTranslation[3][0] = 0.0f;  // Remove translation
+    viewNoTranslation[3][0] = 0.0f; // Remove translation
     viewNoTranslation[3][1] = 0.0f;
     viewNoTranslation[3][2] = 0.0f;
     glm_mat4_copy(viewNoTranslation, skyboxUbo.view);
-    
+
     // Projection (same as regular objects)
     mat4 proj;
-    glm_perspective(glm_rad(80.0f), 
-                   renderer->swapchainExtent.width / (float)renderer->swapchainExtent.height,
-                   0.001f, 1000.0f, proj);
+    glm_perspective(glm_rad(80.0f),
+                    renderer->swapchainExtent.width /
+                        (float)renderer->swapchainExtent.height,
+                    0.001f, 1000.0f, proj);
     proj[1][1] *= -1.0f;
     glm_mat4_copy(proj, skyboxUbo.proj);
-    
-    memcpy(renderer->skyboxObject.uniformBuffersMap[renderer->currentFrame], 
+
+    memcpy(renderer->skyboxObject
+               .uniformBuffersMap[renderer->currentFrame],
            &skyboxUbo, sizeof(skyboxUbo));
 }
 
@@ -1911,7 +1952,7 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = NULL;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     VkDescriptorSetLayoutBinding normalLayoutBinding = {0};
     normalLayoutBinding.binding = 2;
     normalLayoutBinding.descriptorCount = 1;
@@ -1919,7 +1960,7 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     normalLayoutBinding.pImmutableSamplers = NULL;
     normalLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    
+
     VkDescriptorSetLayoutBinding roughnessLayoutBinding = {0};
     roughnessLayoutBinding.binding = 3;
     roughnessLayoutBinding.descriptorCount = 1;
@@ -1928,10 +1969,9 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     roughnessLayoutBinding.pImmutableSamplers = NULL;
     roughnessLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding,
-                                               samplerLayoutBinding,
-                                               normalLayoutBinding,
-                                               roughnessLayoutBinding};
+    VkDescriptorSetLayoutBinding bindings[] = {
+        uboLayoutBinding, samplerLayoutBinding, normalLayoutBinding,
+        roughnessLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType =
@@ -1945,10 +1985,11 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
     {
         printf("SK ERROR: Failed to create descriptor set layout.\n");
     }
-    
+
     VkDescriptorSetLayoutBinding lightBufferBinding = {0};
     lightBufferBinding.binding = 0;
-    lightBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    lightBufferBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     lightBufferBinding.descriptorCount = 1;
     lightBufferBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     lightBufferBinding.pImmutableSamplers = NULL;
@@ -1963,9 +2004,10 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
             renderer->device, &layoutInfo2, NULL,
             &renderer->lightDescriptorSetLayout) != VK_SUCCESS)
     {
-        printf("SK ERROR: Failed to create descriptor set layout for lights.\n");
+        printf("SK ERROR: Failed to create descriptor set layout for "
+               "lights.\n");
     }
-    
+
     VkDescriptorSetLayoutBinding uniformBinding = {0};
     uniformBinding.binding = 0;
     uniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1983,17 +2025,53 @@ void skRenderer_CreateDescriptorSetLayout(skRenderer* renderer)
             renderer->device, &layoutInfo3, NULL,
             &renderer->uniformDescriptorSetLayout) != VK_SUCCESS)
     {
-        printf("SK ERROR: Failed to create descriptor set layout for global uniforms.\n");
+        printf("SK ERROR: Failed to create descriptor set layout for "
+               "global uniforms.\n");
+    }
+
+    VkDescriptorSetLayoutBinding bonesBufferBinding = {0};
+    bonesBufferBinding.binding = 0;
+    bonesBufferBinding.descriptorType =
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bonesBufferBinding.descriptorCount = 1;
+    bonesBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    bonesBufferBinding.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo4 = {0};
+    layoutInfo4.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo4.bindingCount = 1;
+    layoutInfo4.pBindings = &bonesBufferBinding;
+
+    if (vkCreateDescriptorSetLayout(
+            renderer->device, &layoutInfo4, NULL,
+            &renderer->bonesDescriptorSetLayout) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to create descriptor set layout for "
+               "bones.\n");
     }
 }
 
 void skRenderer_CreateDescriptorSets(skRenderer* renderer)
 {
     VkDeviceSize bufferSize = 48 * SK_MAX_LIGHTS;
-    VkDeviceSize uniformBufferSize = sizeof(skGlobalUniformBufferObject);
-    
+    VkDeviceSize boneSize = sizeof(mat4) * SK_MAX_BONES;
+    VkDeviceSize uniformBufferSize =
+        sizeof(skGlobalUniformBufferObject);
+
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
+        skRenderer_CreateBuffer(
+            renderer, boneSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &renderer->boneBuffers[frame],
+            &renderer->boneBuffersMemory[frame]);
+
+        vkMapMemory(renderer->device,
+                    renderer->boneBuffersMemory[frame], 0, boneSize,
+                    0, &renderer->boneBuffersMap[frame]);
+
         skRenderer_CreateBuffer(
             renderer, bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -2001,12 +2079,13 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
             &renderer->storageBuffers[frame],
             &renderer->storageBuffersMemory[frame]);
 
-        vkMapMemory(renderer->device,
-                    renderer->storageBuffersMemory[frame], 0,
-                    bufferSize, 0, &renderer->storageBuffersMap[frame]);
-        
+        vkMapMemory(
+            renderer->device, renderer->storageBuffersMemory[frame],
+            0, bufferSize, 0, &renderer->storageBuffersMap[frame]);
+
         skRenderer_CreateBuffer(
-            renderer, uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            renderer, uniformBufferSize,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &renderer->uniformBuffers[frame],
@@ -2014,7 +2093,8 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
 
         vkMapMemory(renderer->device,
                     renderer->uniformBuffersMemory[frame], 0,
-                    uniformBufferSize, 0, &renderer->uniformBuffersMap[frame]);
+                    uniformBufferSize, 0,
+                    &renderer->uniformBuffersMap[frame]);
     }
 
     VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
@@ -2030,7 +2110,8 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
     allocInfo.pSetLayouts = layouts;
 
     if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
-                                 renderer->lightDescriptorSets) != VK_SUCCESS)
+                                 renderer->lightDescriptorSets) !=
+        VK_SUCCESS)
     {
         printf("SK ERROR: Failed to allocate descriptor sets for "
                "light.");
@@ -2047,7 +2128,8 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         VkWriteDescriptorSet descriptorWrites[] = {{0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = renderer->lightDescriptorSets[frame];
+        descriptorWrites[0].dstSet =
+            renderer->lightDescriptorSets[frame];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType =
@@ -2058,7 +2140,52 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
                                0, NULL);
     }
-    
+
+    VkDescriptorSetLayout boneLayouts[SK_FRAMES_IN_FLIGHT];
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        boneLayouts[i] = renderer->bonesDescriptorSetLayout;
+    }
+
+    VkDescriptorSetAllocateInfo boneAllocInfo = {0};
+    boneAllocInfo.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    boneAllocInfo.descriptorPool = renderer->descriptorPool;
+    boneAllocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
+    boneAllocInfo.pSetLayouts = boneLayouts;
+
+    if (vkAllocateDescriptorSets(renderer->device, &boneAllocInfo,
+                                 renderer->boneDescriptorSets) !=
+        VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate descriptor sets for "
+               "bones.");
+    }
+
+    // Update descriptor sets
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        VkDescriptorBufferInfo bufferInfo = {0};
+        bufferInfo.buffer = renderer->boneBuffers[frame];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(mat4) * SK_MAX_BONES;
+
+        VkWriteDescriptorSet descriptorWrites[] = {{0}};
+        descriptorWrites[0].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet =
+            renderer->boneDescriptorSets[frame];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
+                               0, NULL);
+    }
+
     VkDescriptorSetLayout uniformLayouts[SK_FRAMES_IN_FLIGHT];
     for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
     {
@@ -2072,7 +2199,8 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
     allocInfo2.pSetLayouts = uniformLayouts;
 
     if (vkAllocateDescriptorSets(renderer->device, &allocInfo2,
-                                 renderer->uniformDescriptorSets) != VK_SUCCESS)
+                                 renderer->uniformDescriptorSets) !=
+        VK_SUCCESS)
     {
         printf("SK ERROR: Failed to allocate descriptor sets for "
                "light.");
@@ -2089,7 +2217,8 @@ void skRenderer_CreateDescriptorSets(skRenderer* renderer)
         VkWriteDescriptorSet descriptorWrites[] = {{0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = renderer->uniformDescriptorSets[frame];
+        descriptorWrites[0].dstSet =
+            renderer->uniformDescriptorSets[frame];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType =
@@ -2126,8 +2255,7 @@ void skRenderer_AddRenderObject(skRenderer*     renderer,
     skVector_PushBack(renderer->renderObjects, object);
 }
 
-void skRenderer_AddLight(skRenderer*     renderer,
-                                skLight* light)
+void skRenderer_AddLight(skRenderer* renderer, skLight* light)
 {
     skVector_PushBack(renderer->lights, light);
 }
@@ -2199,20 +2327,23 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = obj->textureImageView;
         imageInfo.sampler = obj->textureSampler;
-        
+
         VkDescriptorImageInfo normalImageInfo = {0};
         normalImageInfo.imageLayout =
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         normalImageInfo.imageView = obj->normalImageView;
         normalImageInfo.sampler = obj->normalSampler;
-        
+
         VkDescriptorImageInfo roughnessImageInfo = {0};
         roughnessImageInfo.imageLayout =
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         roughnessImageInfo.imageView = obj->roughnessImageView;
         roughnessImageInfo.sampler = obj->roughnessSampler;
 
-        VkWriteDescriptorSet descriptorWrites[] = {{0}, {0}, {0}, {0}};
+        VkWriteDescriptorSet descriptorWrites[] = {{0},
+                                                   {0},
+                                                   {0},
+                                                   {0}};
         descriptorWrites[0].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = obj->descriptorSets[frame];
@@ -2232,7 +2363,7 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
-        
+
         descriptorWrites[2].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[2].dstSet = obj->descriptorSets[frame];
@@ -2242,7 +2373,7 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pImageInfo = &normalImageInfo;
-        
+
         descriptorWrites[3].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[3].dstSet = obj->descriptorSets[frame];
@@ -2351,11 +2482,10 @@ skRenderer skRenderer_Create(skWindow* window)
 
     renderer.currentFrame = 0;
     renderer.window = window;
-    
+
     renderer.renderObjects =
         skVector_Create(sizeof(skRenderObject), 10);
-    renderer.lights =
-        skVector_Create(sizeof(skLight), 10);
+    renderer.lights = skVector_Create(sizeof(skLight), 10);
 
     skRenderer_CreateInstance(rendererPtr);
     skRenderer_CreateSurface(rendererPtr, window);
@@ -2375,19 +2505,19 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateDescriptorSets(&renderer);
     skRenderer_CreateCommandBuffers(&renderer);
     skRenderer_CreateSyncObjects(&renderer);
-    
+
     skModel model = skModel_Create();
     skModel_Load(&model, "res/models/sphere.fbx");
 
-    renderer.skyboxObject = skRenderObject_CreateFromModel(&renderer, &model,
-                                         "res/textures/skybox.bmp", 
-                                         "res/textures/defualt_normal.bmp",
-                                         "res/textures/default_roughness.bmp");
-    
+    renderer.skyboxObject = skRenderObject_CreateFromModel(
+        &renderer, &model, "res/textures/skybox.bmp",
+        "res/textures/defualt_normal.bmp",
+        "res/textures/default_roughness.bmp");
+
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
     {
         skRenderer_CreateBuffer(
-            &renderer, sizeof(skUniformBufferObject), 
+            &renderer, sizeof(skUniformBufferObject),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -2395,13 +2525,14 @@ skRenderer skRenderer_Create(skWindow* window)
             &renderer.skyboxObject.uniformBuffersMemory[frame]);
 
         vkMapMemory(renderer.device,
-                    renderer.skyboxObject.uniformBuffersMemory[frame], 0,
-                    sizeof(skUniformBufferObject), 0, 
+                    renderer.skyboxObject.uniformBuffersMemory[frame],
+                    0, sizeof(skUniformBufferObject), 0,
                     &renderer.skyboxObject.uniformBuffersMap[frame]);
     }
-    
-    skRenderer_CreateDescriptorSetsForObject(&renderer, &renderer.skyboxObject);
-    
+
+    skRenderer_CreateDescriptorSetsForObject(&renderer,
+                                             &renderer.skyboxObject);
+
     mat4 trans = GLM_MAT4_IDENTITY_INIT;
     glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
     glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
@@ -2437,15 +2568,14 @@ void skRenderer_Destroy(skRenderer* renderer)
     vkDestroyRenderPass(renderer->device, renderer->renderPass, NULL);
 }
 
-void skRenderer_CreateTexture(skRenderer* renderer, 
+void skRenderer_CreateTexture(skRenderer*    renderer,
                               VkImage        textureImage,
                               VkDeviceMemory textureImageMemory,
                               VkImageView    textureImageView,
                               VkSampler      textureSampler,
-                              stbi_uc*       pixels,
-                              VkDeviceSize   imageSize,
+                              stbi_uc* pixels, VkDeviceSize imageSize,
                               int texWidth, int texHeight)
-{  
+{
     VkBuffer       imageStagingBuffer;
     VkDeviceMemory imageStagingBufferMemory;
 
@@ -2519,11 +2649,9 @@ void skRenderer_CreateTexture(skRenderer* renderer,
     }
 }
 
-skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
-                                              skModel*    model,
-                                              const char* texturePath,
-                                              const char* normalTexturePath,
-                                              const char* roughnessTexturePath)
+skRenderObject skRenderObject_CreateFromModel(
+    skRenderer* renderer, skModel* model, const char* texturePath,
+    const char* normalTexturePath, const char* roughnessTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2604,280 +2732,285 @@ skRenderObject skRenderObject_CreateFromModel(skRenderer* renderer,
 
     {
 
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(texturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load texture image.");
-        pixels = stbi_load("res/textures/image.bmp", &texWidth, &texHeight,
-                           &texChannels, STBI_rgb_alpha);
-    }
+        if (!pixels)
+        {
+            printf("SK ERROR: Failed to load texture image.");
+            pixels =
+                stbi_load("res/textures/image.bmp", &texWidth,
+                          &texHeight, &texChannels, STBI_rgb_alpha);
+        }
 
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
 
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
 
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
 
-    stbi_image_free(pixels);
+        stbi_image_free(pixels);
 
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
-        &obj.textureImageMemory);
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
+            &obj.textureImageMemory);
 
-    skRenderer_TransitionImageLayout(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.textureImage, (u32)(texWidth),
-                                 (u32)(texHeight));
+        skRenderer_TransitionImageLayout(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(
+            renderer, imageStagingBuffer, obj.textureImage,
+            (u32)(texWidth), (u32)(texHeight));
 
-    skRenderer_TransitionImageLayout(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        skRenderer_TransitionImageLayout(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    obj.textureImageView = skRenderer_CreateImageView(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
+        obj.textureImageView = skRenderer_CreateImageView(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
 
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
 
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
 
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
 
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.textureSampler) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create texture sampler.");
-    }
-
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.textureSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create texture sampler.");
+        }
     }
 
     glm_mat4_identity(obj.transform);
-    
+
     {
 
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(normalTexturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
 
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load texture image.");
-        pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
-                           &texChannels, STBI_rgb_alpha);
-    }
-    
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
+        if (!pixels)
+        {
+            printf("SK ERROR: Failed to load texture image.");
+            pixels =
+                stbi_load("res/textures/normal.bmp", &texWidth,
+                          &texHeight, &texChannels, STBI_rgb_alpha);
+        }
 
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
 
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
 
-    stbi_image_free(pixels);
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
 
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
-        &obj.normalImageMemory);
+        stbi_image_free(pixels);
 
-    skRenderer_TransitionImageLayout(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.normalImage, (u32)(texWidth),
-                                 (u32)(texHeight));
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
+            &obj.normalImageMemory);
 
-    skRenderer_TransitionImageLayout(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        skRenderer_TransitionImageLayout(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                     obj.normalImage, (u32)(texWidth),
+                                     (u32)(texHeight));
 
-    obj.normalImageView = skRenderer_CreateImageView(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
+        skRenderer_TransitionImageLayout(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
+        obj.normalImageView = skRenderer_CreateImageView(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
 
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
 
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
 
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.normalSampler) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create normal sampler.");
-    }
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
 
-    }
-    
-    {
-
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(roughnessTexturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
-
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load roughness texture image.");
-        pixels = stbi_load("res/textures/default_roughness.bmp", &texWidth, &texHeight,
-                           &texChannels, STBI_rgb_alpha);
-    }
-    
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
-
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
-
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
-        &obj.roughnessImageMemory);
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.roughnessImage, (u32)(texWidth),
-                                 (u32)(texHeight));
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    obj.roughnessImageView = skRenderer_CreateImageView(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.roughnessSampler) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create normal sampler.");
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.normalSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create normal sampler.");
+        }
     }
 
+    {
+
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(roughnessTexturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
+
+        if (!pixels)
+        {
+            printf(
+                "SK ERROR: Failed to load roughness texture image.");
+            pixels = stbi_load("res/textures/default_roughness.bmp",
+                               &texWidth, &texHeight, &texChannels,
+                               STBI_rgb_alpha);
+        }
+
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
+
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
+
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
+            &obj.roughnessImageMemory);
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(
+            renderer, imageStagingBuffer, obj.roughnessImage,
+            (u32)(texWidth), (u32)(texHeight));
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        obj.roughnessImageView = skRenderer_CreateImageView(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.roughnessSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create normal sampler.");
+        }
     }
 
     return obj;
 }
 
-skRenderObject
-skRenderObject_CreateFromSprite(skRenderer* renderer,
-                                const char* texturePath,
-                                const char* normalTexturePath,
-                                const char* roughnessTexturePath)
+skRenderObject skRenderObject_CreateFromSprite(
+    skRenderer* renderer, const char* texturePath,
+    const char* normalTexturePath, const char* roughnessTexturePath)
 {
     skRenderObject obj = {0};
 
@@ -2961,270 +3094,276 @@ skRenderObject_CreateFromSprite(skRenderer* renderer,
 
     // Create texture image
 
-    { 
-
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(texturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load texture image.");
-    }
-
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
-
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
-
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
-        &obj.textureImageMemory);
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.textureImage, (u32)(texWidth),
-                                 (u32)(texHeight));
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    obj.textureImageView = skRenderer_CreateImageView(
-        renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.textureSampler) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create texture sampler.");
-    }
-
-    glm_mat4_identity(obj.transform);
-
-    }
-
-    {
-    
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(normalTexturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
-
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load texture image.");
-        pixels = stbi_load("res/textures/normal.bmp", &texWidth, &texHeight,
-                           &texChannels, STBI_rgb_alpha);
-    }
-    
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
-
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
-
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
-        &obj.normalImageMemory);
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.normalImage, (u32)(texWidth),
-                                 (u32)(texHeight));
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    obj.normalImageView = skRenderer_CreateImageView(
-        renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.normalSampler) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create normal sampler.");
-    }
-
-    }
-    
     {
 
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(roughnessTexturePath, &texWidth, &texHeight,
-                                &texChannels, STBI_rgb_alpha);
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(texturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-    if (!pixels)
-    {
-        printf("SK ERROR: Failed to load roughness texture image.");
-        pixels = stbi_load("res/textures/default_roughness.bmp", &texWidth, &texHeight,
-                           &texChannels, STBI_rgb_alpha);
+        if (!pixels)
+        {
+            printf("SK ERROR: Failed to load texture image.");
+        }
+
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
+
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
+
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
+            &obj.textureImageMemory);
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(
+            renderer, imageStagingBuffer, obj.textureImage,
+            (u32)(texWidth), (u32)(texHeight));
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        obj.textureImageView = skRenderer_CreateImageView(
+            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.textureSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create texture sampler.");
+        }
+
+        glm_mat4_identity(obj.transform);
     }
-    
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-    VkBuffer       imageStagingBuffer;
-    VkDeviceMemory imageStagingBufferMemory;
-
-    skRenderer_CreateBuffer(
-        renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &imageStagingBuffer, &imageStagingBufferMemory);
-
-    void* imageData;
-    vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                imageSize, 0, &imageData);
-    memcpy(imageData, pixels, imageSize);
-    vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    skRenderer_CreateImage(
-        renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
-        &obj.roughnessImageMemory);
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                 obj.roughnessImage, (u32)(texWidth),
-                                 (u32)(texHeight));
-
-    skRenderer_TransitionImageLayout(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    obj.roughnessImageView = skRenderer_CreateImageView(
-        renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkSamplerCreateInfo samplerInfo = {0};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 0;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                        &obj.roughnessSampler) != VK_SUCCESS)
     {
-        printf("SK ERROR: Failed to create normal sampler.");
+
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(normalTexturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
+
+        if (!pixels)
+        {
+            printf("SK ERROR: Failed to load texture image.");
+            pixels =
+                stbi_load("res/textures/normal.bmp", &texWidth,
+                          &texHeight, &texChannels, STBI_rgb_alpha);
+        }
+
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
+
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
+
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
+            &obj.normalImageMemory);
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
+                                     obj.normalImage, (u32)(texWidth),
+                                     (u32)(texHeight));
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        obj.normalImageView = skRenderer_CreateImageView(
+            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.normalSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create normal sampler.");
+        }
     }
 
+    {
+
+        int      texWidth, texHeight, texChannels;
+        stbi_uc* pixels =
+            stbi_load(roughnessTexturePath, &texWidth, &texHeight,
+                      &texChannels, STBI_rgb_alpha);
+
+        if (!pixels)
+        {
+            printf(
+                "SK ERROR: Failed to load roughness texture image.");
+            pixels = stbi_load("res/textures/default_roughness.bmp",
+                               &texWidth, &texHeight, &texChannels,
+                               STBI_rgb_alpha);
+        }
+
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+        VkBuffer       imageStagingBuffer;
+        VkDeviceMemory imageStagingBufferMemory;
+
+        skRenderer_CreateBuffer(
+            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &imageStagingBuffer, &imageStagingBufferMemory);
+
+        void* imageData;
+        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
+                    imageSize, 0, &imageData);
+        memcpy(imageData, pixels, imageSize);
+        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        skRenderer_CreateImage(
+            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
+            &obj.roughnessImageMemory);
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        skRenderer_CopyBufferToImage(
+            renderer, imageStagingBuffer, obj.roughnessImage,
+            (u32)(texWidth), (u32)(texHeight));
+
+        skRenderer_TransitionImageLayout(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        obj.roughnessImageView = skRenderer_CreateImageView(
+            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkSamplerCreateInfo samplerInfo = {0};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 0;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
+                            &obj.roughnessSampler) != VK_SUCCESS)
+        {
+            printf("SK ERROR: Failed to create normal sampler.");
+        }
     }
 
     return obj;

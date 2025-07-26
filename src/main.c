@@ -7,7 +7,7 @@ int main(int argc, char** argv)
         skWindow_Create("Sulkan", 800, 600, false, true);
 
     skRenderer renderer = skRenderer_Create(&window);
-    
+
     skRenderer_InitImGui(&renderer);
 
     skSceneHandle scene = skECS_CreateScene();
@@ -31,6 +31,28 @@ int main(int argc, char** argv)
     skEditor editor = {.ecsState = &ecsState};
     strcpy(editor.sceneName, "res/scenes/main_scene.json");
 
+    skRenderObject obj = {0};
+
+    skModel model = skModel_Create();
+    skModel_Load(&model, "res/models/dancing_vampire.dae");
+
+    obj = skRenderObject_CreateFromModel(
+        &renderer, &model, "res/textures/image.bmp",
+        "res/textures/default_normal.bmp", "res/textures/default_roughness.bmp");
+
+    mat4 trans = GLM_MAT4_IDENTITY_INIT;
+    glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
+    glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
+    glm_scale(trans, (vec3) {1.0f, 1.0f, 1.0f});
+
+    glm_mat4_copy(trans, obj.transform);
+
+    skRenderer_AddRenderObject(&renderer, &obj);
+
+    skAnimation anim = skAnimation_Create("res/models/dancing_vampire.dae", &model);
+
+    skAnimator animator = skAnimator_Create(&anim);
+
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
     skECS_AddSystem(skLightAssociation_StartSys, true);
@@ -41,6 +63,8 @@ int main(int argc, char** argv)
     while (!skWindow_ShouldClose(&window))
     {
         skECS_UpdateSystems(&ecsState);
+
+        skAnimator_UpdateAnimation(&animator, ecsState.deltaTime);
 
         skRenderer_DrawFrame(&renderer, &editor);
 

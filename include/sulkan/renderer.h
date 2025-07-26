@@ -16,6 +16,7 @@
 
 #define SK_FRAMES_IN_FLIGHT   (2)
 #define SK_MAX_RENDER_OBJECTS (1000)
+#define SK_MAX_BONES (100)
 
 typedef struct skSwapchainDetails
 {
@@ -83,6 +84,8 @@ typedef struct skRenderObject
     VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
     void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
 
+    skVector* boneTransforms; // mat4, not owned by this struct
+
     mat4 transform;
 } skRenderObject;
 
@@ -115,6 +118,7 @@ typedef struct skRenderer
     VkDescriptorSetLayout    descriptorSetLayout;
     VkDescriptorSetLayout    lightDescriptorSetLayout;
     VkDescriptorSetLayout    uniformDescriptorSetLayout;
+    VkDescriptorSetLayout    bonesDescriptorSetLayout;
     VkDescriptorPool         descriptorPool;
     VkImage                  depthImage;
     VkImageView              depthImageView;
@@ -130,6 +134,11 @@ typedef struct skRenderer
     VkBuffer        storageBuffers[SK_FRAMES_IN_FLIGHT];
     VkDeviceMemory  storageBuffersMemory[SK_FRAMES_IN_FLIGHT];
     void*           storageBuffersMap[SK_FRAMES_IN_FLIGHT];
+    
+    VkDescriptorSet boneDescriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer        boneBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory  boneBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void*           boneBuffersMap[SK_FRAMES_IN_FLIGHT];
 
     VkDescriptorSet uniformDescriptorSets[SK_FRAMES_IN_FLIGHT];
     VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];

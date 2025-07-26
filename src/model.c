@@ -1,6 +1,7 @@
 #include <sulkan/model.h>
 #include <stb/stb_image.h>
 #include <assert.h>
+#include <sulkan/essentials.h>
 
 skMesh skMesh_Create(skVector* meshVertices, skVector* meshIndices,
                      skVector* meshTextures)
@@ -52,6 +53,12 @@ skModel skModel_Create()
 {
     skModel model = {0};
 
+    model.boneInfoMap =
+        skMap_Create(sizeof(char*), sizeof(skBoneInfo), 0,
+                     skMap_StringHash, skMap_StringCompare);
+    model.boneNameToIndex =
+        skMap_Create(sizeof(char*), sizeof(u32), 0, skMap_StringHash,
+                     skMap_StringCompare);
     model.loadedTextures = skVector_Create(sizeof(skTexture), 2);
     model.meshes = skVector_Create(sizeof(skMesh), 2);
 
@@ -117,6 +124,27 @@ void skModel_ProcessNode(skModel* model, struct aiNode* node,
     }
 }
 
+void skSetVertexBoneDataToDefault(skVertex* vertex)
+{
+    for (int i = 0; i < SK_MAX_BONE_INFLUENCE; i++)
+    {
+        vertex->boneIDs[i] = -1;
+        vertex->weights[i] = 0.0f;
+    }
+}
+
+void skSetVertexBoneData(skVertex* vertex, int id, float weight)
+{
+    for (int i = 0; i < SK_MAX_BONE_INFLUENCE; i++)
+    {
+        if (vertex->boneIDs[i] < 0)
+        {
+            vertex->boneIDs[i] = id;
+            vertex->weights[i] = weight;
+        }
+    }
+}
+
 // Process mesh
 skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
                            const struct aiScene* scene)
@@ -134,6 +162,8 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
     for (unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
         skVertex vertex;
+
+        skSetVertexBoneDataToDefault(&vertex);
 
         // Position
         skAssimpVec3ToGLM(&mesh->mVertices[i], vertex.position);
@@ -155,7 +185,7 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
             vertex.tangent[0] = mesh->mTangents[i].x;
             vertex.tangent[1] = mesh->mTangents[i].y;
             vertex.tangent[2] = mesh->mTangents[i].z;
-            
+
             vertex.bitangent[0] = mesh->mBitangents[i].x;
             vertex.bitangent[1] = mesh->mBitangents[i].y;
             vertex.bitangent[2] = mesh->mBitangents[i].z;
@@ -205,6 +235,9 @@ skMesh skModel_ProcessMesh(skModel* model, struct aiMesh* mesh,
             model, material, aiTextureType_AMBIENT, "texture_height",
             scene, textures);
     }
+
+    skModel_ExtractBoneWeightForVertices(model, vertices, mesh,
+                                         scene);
 
     skMesh result = skMesh_Create(vertices, indices, textures);
 
@@ -283,4 +316,58 @@ void skModel_Destroy(skModel* model)
 
     skVector_Free(model->meshes);
     skVector_Free(model->loadedTextures);
+    skMap_Free(model->boneInfoMap);
+}
+
+void skModel_ExtractBoneWeightForVertices(skModel*       model,
+                                          skVector*      vertices,
+                                          struct aiMesh* mesh,
+                                          const struct aiScene* scene)
+{
+    for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+    {
+        int         boneID = -1;
+        const char* boneName = mesh->mBones[boneIndex]->mName.data;
+
+        if (!skMap_Contains(model->boneInfoMap, &boneName))
+        {
+            skBoneInfo newBoneInfo;
+            newBoneInfo.id = model->boneCount;
+            skAssimpMat4ToGLM(&mesh->mBones[boneIndex]->mOffsetMatrix,
+                              newBoneInfo.offset);
+
+            skMap_Insert(model->boneInfoMap, &boneName, &newBoneInfo);
+
+            boneID = model->boneCount;
+            model->boneCount++;
+        }
+        else
+        {
+            skBoneInfo* boneInfo =
+                (skBoneInfo*)skMap_Get(model->boneInfoMap, &boneName);
+            boneID = boneInfo->id;
+        }
+
+        for (u32 i = 0; i < mesh->mNumBones; i++)
+        {
+            const char* name = mesh->mBones[i]->mName.data;
+            skMap_Insert(model->boneNameToIndex, &name, &i);
+        }
+
+        assert(boneID != -1);
+        struct aiVertexWeight* weights =
+            mesh->mBones[boneIndex]->mWeights;
+        int numWeights = mesh->mBones[boneIndex]->mNumWeights;
+
+        for (int weightIndex = 0; weightIndex < numWeights;
+             ++weightIndex)
+        {
+            int   vertexId = weights[weightIndex].mVertexId;
+            float weight = weights[weightIndex].mWeight;
+            assert(vertexId <= vertices->size);
+            skVertex* vert =
+                (skVertex*)skVector_Get(vertices, vertexId);
+            skSetVertexBoneData(vert, boneID, weight);
+        }
+    }
 }

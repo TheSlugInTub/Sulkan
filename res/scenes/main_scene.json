@@ -68,17 +68,17 @@
         },
         {
             "color": [
-                1.0,
-                1.0,
+                0.0,
+                1.100000023841858,
                 1.0
             ],
             "componentType": "skLightAssociation",
-            "intensity": 1.0,
-            "lightIndex": 1,
+            "intensity": 0.5,
+            "lightIndex": 0,
             "position": [
-                -0.5569999814033508,
-                0.5,
-                0.5920000076293945
+                1.5429999828338623,
+                0.10000000149011612,
+                0.492000013589859
             ],
             "radius": 1.0
         }
@@ -91,7 +91,7 @@
         {
             "componentType": "skRenderAssociation",
             "modelPath": "res/models/sphere.fbx",
-            "normalTexturePath": "res/textures/brickwall_normal.bmp",
+            "normalTexturePath": "res/textures/bricks_normal.png",
             "objectIndex": 2,
             "position": [
                 1.0260000228881836,
@@ -104,14 +104,36 @@
                 0.0,
                 0.0
             ],
-            "roughnessTexturePath": "",
+            "roughnessTexturePath": "res/textures/bricks_roughness.png",
             "scale": [
                 0.20000000298023224,
                 0.20000000298023224,
                 0.20000000298023224
             ],
-            "texturePath": "res/textures/brickwall.bmp",
+            "texturePath": "res/textures/bricks.png",
             "type": 0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "Entity"
+        },
+        {
+            "color": [
+                1.0,
+                0.0,
+                1.0
+            ],
+            "componentType": "skLightAssociation",
+            "intensity": 2.5999999046325684,
+            "lightIndex": 1,
+            "position": [
+                -0.4000000059604645,
+                0.0,
+                0.5
+            ],
+            "radius": 1.0
         }
     ]
 ]

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sulkan/vector.h>
+#include <sulkan/map.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -8,13 +9,23 @@
 #include <assimp/vector3.h>
 #include <cglm/cglm.h>
 
+#define SK_MAX_BONE_INFLUENCE 4
+
+typedef struct skBoneInfo
+{
+    int  id;
+    mat4 offset;
+} skBoneInfo;
+
 typedef struct
 {
-    vec3 position;
-    vec3 normal;
-    vec2 textureCoordinates;
-    vec3 tangent;
-    vec3 bitangent;
+    vec3  position;
+    vec3  normal;
+    vec2  textureCoordinates;
+    vec3  tangent;
+    vec3  bitangent;
+    int   boneIDs[SK_MAX_BONE_INFLUENCE];
+    float weights[SK_MAX_BONE_INFLUENCE];
 } skVertex;
 
 typedef struct
@@ -39,8 +50,11 @@ typedef struct
 {
     char      path[128];
     char      directory[128];
-    skVector* loadedTextures; // skTexture
-    skVector* meshes;         // skMesh
+    skVector* loadedTextures;  // skTexture
+    skVector* meshes;          // skMesh
+    skMap*    boneInfoMap;     // char*, skBoneInfo
+    skMap*    boneNameToIndex; // char*, u32
+    int       boneCount;
 } skModel;
 
 skModel skModel_Create();
@@ -55,6 +69,13 @@ void    skModel_LoadMaterialTextures(skModel*              model,
                                      const char*           typeName,
                                      const struct aiScene* scene,
                                      skVector*             textures);
+void skSetVertexBoneDataToDefault(skVertex* vertex);
+void skSetVertexBoneData(skVertex* vertex, 
+        int id, float weight);
+void skModel_ExtractBoneWeightForVertices(skModel*       model,
+                                          skVector*      vertices,
+                                          struct aiMesh*        mesh,
+                                          const struct aiScene* scene);
 
 unsigned int skTextureFromFile(const char* path,
                                const char* directory);
