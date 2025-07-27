@@ -26,29 +26,40 @@ layout(set = 3, binding = 0, std430) restrict readonly buffer MatrixBuffer {
 
 void main() 
 {
-    fragWorldPos = vec3(ubo.model * vec4(inPosition, 1.0));
-    fragNormal = normalize(mat3(transpose(inverse(ubo.model))) * inNormal);
-    fragTexCoord = inTexCoord;
-
-    vec4 totalPosition = vec4(0.0f);
-
-    for (int i = 0; i < 4; i++)
+    // Calculate the skinning matrix by blending bone matrices based on weights
+    mat4 boneTransform = mat4(0.0);
+    for(int i = 0; i < 4; i++)
     {
-        if (inBoneIDs[i] == -1)
-            continue;
-
-        vec4 localPosition = boneMatrices[inBoneIDs[i]] * vec4(inPosition, 1.0f);
-        totalPosition += localPosition * inWeights[i];
+        if(inBoneIDs[i] >= 0) // Check for valid bone ID
+        {
+            boneTransform += boneMatrices[inBoneIDs[i]] * inWeights[i];
+        }
+        else
+        {
+            boneTransform = mat4(1.0);
+        }
     }
     
+    // Apply skeletal animation to position and normal
+    vec4 skinnedPosition = boneTransform * vec4(inPosition, 1.0);
+    vec3 skinnedNormal = mat3(boneTransform) * inNormal;
+    vec3 skinnedTangent = mat3(boneTransform) * inTangent;
+    
+    // Transform to world space
+    fragWorldPos = vec3(ubo.model * skinnedPosition);
+    fragNormal = normalize(mat3(transpose(inverse(ubo.model))) * skinnedNormal);
+    fragTexCoord = inTexCoord;
+    
+    // Calculate TBN matrix with skinned tangent and normal
     mat3 normalMatrix = transpose(inverse(mat3(ubo.model)));
-
-    vec3 T = normalize(normalMatrix * inTangent);
-    vec3 N = normalize(normalMatrix * inNormal);
-    T = normalize(T - dot(T, N) * N);
+    
+    vec3 T = normalize(normalMatrix * skinnedTangent);
+    vec3 N = normalize(normalMatrix * skinnedNormal);
+    T = normalize(T - dot(T, N) * N); // Gram-Schmidt orthogonalization
     vec3 B = cross(N, T);
     
     fragTBN = transpose(mat3(T, B, N));
 
-    gl_Position = ubo.proj * ubo.view * ubo.model * totalPosition;
+    // Final position transformation
+    gl_Position = ubo.proj * ubo.view * ubo.model * skinnedPosition;
 }

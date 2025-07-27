@@ -1151,18 +1151,6 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                     mat, sizeof(mat4));
             }
         }
-        else
-        {
-            for (int i = 0; i < 100; i++)
-            {
-                mat4 mat = GLM_MAT4_IDENTITY_INIT;
-                memcpy(
-                    (char*)renderer
-                            ->boneBuffersMap[renderer->currentFrame] +
-                        (i * sizeof(mat4)),
-                    &mat, sizeof(mat4));
-            }
-        }
 
         // Bind vertex and index buffers for this object
         VkBuffer     vertexBuffers[] = {obj->vertexBuffer};

@@ -17,7 +17,6 @@ void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
 void skEditor_LoadScene(skECSState* state, skSceneHandle scene, const char* filepath)
 {
     skECS_ClearScene(scene);
-    skVector_Clear(state->renderer->renderObjects);
 
     skJson j = skJson_LoadFromFile(filepath);
 

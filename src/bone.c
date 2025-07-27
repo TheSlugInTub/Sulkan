@@ -42,10 +42,10 @@ skBone skBone_Create(const char* name, int ID,
             channel->mRotationKeys[rotationIndex].mValue;
         float timeStamp = channel->mRotationKeys[rotationIndex].mTime;
         skKeyRotation data;
-        data.rotation[0] = aiOrientation.w;
-        data.rotation[1] = aiOrientation.x;
-        data.rotation[2] = aiOrientation.y;
-        data.rotation[3] = aiOrientation.z;
+        data.rotation[0] = aiOrientation.x;
+        data.rotation[1] = aiOrientation.y;
+        data.rotation[2] = aiOrientation.z;
+        data.rotation[3] = aiOrientation.w;
         data.timeStamp = timeStamp;
 
         skVector_PushBack(bone.rotations, &data);
