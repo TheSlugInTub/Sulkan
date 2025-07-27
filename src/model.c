@@ -56,9 +56,6 @@ skModel skModel_Create()
     model.boneInfoMap =
         skMap_Create(sizeof(char*), sizeof(skBoneInfo), 0,
                      skMap_StringHash, skMap_StringCompare);
-    model.boneNameToIndex =
-        skMap_Create(sizeof(char*), sizeof(u32), 0, skMap_StringHash,
-                     skMap_StringCompare);
     model.loadedTextures = skVector_Create(sizeof(skTexture), 2);
     model.meshes = skVector_Create(sizeof(skMesh), 2);
 
@@ -346,12 +343,6 @@ void skModel_ExtractBoneWeightForVertices(skModel*       model,
             skBoneInfo* boneInfo =
                 (skBoneInfo*)skMap_Get(model->boneInfoMap, &boneName);
             boneID = boneInfo->id;
-        }
-
-        for (u32 i = 0; i < mesh->mNumBones; i++)
-        {
-            const char* name = mesh->mBones[i]->mName.data;
-            skMap_Insert(model->boneNameToIndex, &name, &i);
         }
 
         assert(boneID != -1);

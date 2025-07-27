@@ -54,7 +54,8 @@ skBone skBone_Create(const char* name, int ID,
     bone.numScales = channel->mNumScalingKeys;
     for (int keyIndex = 0; keyIndex < bone.numScales; ++keyIndex)
     {
-        const struct aiVector3D scale = channel->mScalingKeys[keyIndex].mValue;
+        const struct aiVector3D scale =
+            channel->mScalingKeys[keyIndex].mValue;
         float      timeStamp = channel->mScalingKeys[keyIndex].mTime;
         skKeyScale data;
         skAssimpVec3ToGLM(&scale, data.scale);
@@ -126,22 +127,20 @@ void skBone_InterpolatePosition(skBone* bone, float animationTime,
         return;
     }
 
-    int   p0Index = skBone_GetPositionIndex(bone, animationTime);
-    int   p1Index = p0Index + 1;
+    int p0Index = skBone_GetPositionIndex(bone, animationTime);
+    int p1Index = p0Index + 1;
+
+    skKeyPosition* key1 =
+        (skKeyPosition*)skVector_Get(bone->positions, p0Index);
+    skKeyPosition* key2 =
+        (skKeyPosition*)skVector_Get(bone->positions, p1Index);
+
     float scaleFactor = skGetScaleFactor(
-        ((skKeyPosition*)skVector_Get(bone->positions, p0Index))
-            ->timeStamp,
-        ((skKeyPosition*)skVector_Get(bone->positions, p1Index))
-            ->timeStamp,
-        animationTime);
+        key1->timeStamp, key2->timeStamp, animationTime);
 
     vec3 finalPosition;
-    glm_vec3_mix(
-        ((skKeyPosition*)skVector_Get(bone->positions, p0Index))
-            ->position,
-        ((skKeyPosition*)skVector_Get(bone->positions, p1Index))
-            ->position,
-        scaleFactor, finalPosition);
+    glm_vec3_mix(key1->position, key2->position, scaleFactor,
+                 finalPosition);
 
     glm_translate(dest, finalPosition);
 }
@@ -157,28 +156,26 @@ void skBone_InterpolateRotation(skBone* bone, float animationTime,
         return;
     }
 
-    int   p0Index = skBone_GetRotationIndex(bone, animationTime);
-    int   p1Index = p0Index + 1;
+    int p0Index = skBone_GetRotationIndex(bone, animationTime);
+    int p1Index = p0Index + 1;
+
+    skKeyRotation* key1 =
+        (skKeyRotation*)skVector_Get(bone->rotations, p0Index);
+    skKeyRotation* key2 =
+        (skKeyRotation*)skVector_Get(bone->rotations, p1Index);
+
     float scaleFactor = skGetScaleFactor(
-        ((skKeyRotation*)skVector_Get(bone->rotations, p0Index))
-            ->timeStamp,
-        ((skKeyRotation*)skVector_Get(bone->rotations, p1Index))
-            ->timeStamp,
-        animationTime);
+        key1->timeStamp, key2->timeStamp, animationTime);
 
     vec4 finalRotation;
-    glm_quat_slerp(
-        ((skKeyRotation*)skVector_Get(bone->rotations, p0Index))
-            ->rotation,
-        ((skKeyRotation*)skVector_Get(bone->rotations, p1Index))
-            ->rotation,
-        scaleFactor, finalRotation);
+    glm_quat_slerp(key1->rotation, key2->rotation, scaleFactor,
+                   finalRotation);
 
     glm_quat_mat4(finalRotation, dest);
 }
 
 void skBone_InterpolateScale(skBone* bone, float animationTime,
-                               mat4 dest)
+                             mat4 dest)
 {
     if (bone->numScales == 1)
     {
@@ -191,18 +188,14 @@ void skBone_InterpolateScale(skBone* bone, float animationTime,
     int   p0Index = skBone_GetScaleIndex(bone, animationTime);
     int   p1Index = p0Index + 1;
     float scaleFactor = skGetScaleFactor(
-        ((skKeyScale*)skVector_Get(bone->scales, p0Index))
-            ->timeStamp,
-        ((skKeyScale*)skVector_Get(bone->scales, p1Index))
-            ->timeStamp,
+        ((skKeyScale*)skVector_Get(bone->scales, p0Index))->timeStamp,
+        ((skKeyScale*)skVector_Get(bone->scales, p1Index))->timeStamp,
         animationTime);
 
     vec3 finalScale;
     glm_vec3_mix(
-        ((skKeyScale*)skVector_Get(bone->scales, p0Index))
-            ->scale,
-        ((skKeyScale*)skVector_Get(bone->scales, p1Index))
-            ->scale,
+        ((skKeyScale*)skVector_Get(bone->scales, p0Index))->scale,
+        ((skKeyScale*)skVector_Get(bone->scales, p1Index))->scale,
         scaleFactor, finalScale);
 
     glm_scale(dest, finalScale);
@@ -210,10 +203,12 @@ void skBone_InterpolateScale(skBone* bone, float animationTime,
 
 void skBone_Update(skBone* bone, float animationTime)
 {
-    mat4 trans = GLM_MAT4_IDENTITY_INIT, rotation = GLM_MAT4_IDENTITY_INIT,
+    mat4 trans = GLM_MAT4_IDENTITY_INIT,
+         rotation = GLM_MAT4_IDENTITY_INIT,
          scale = GLM_MAT4_IDENTITY_INIT;
     skBone_InterpolatePosition(bone, animationTime, trans);
     skBone_InterpolateRotation(bone, animationTime, rotation);
     skBone_InterpolateScale(bone, animationTime, scale);
     glm_mat4_mul(trans, rotation, bone->localTransform);
+    glm_mat4_mul(bone->localTransform, scale, bone->localTransform);
 }

@@ -34,7 +34,7 @@ int main(int argc, char** argv)
     skRenderObject obj = {0};
 
     skModel model = skModel_Create();
-    skModel_Load(&model, "res/models/dancing_vampire.dae");
+    skModel_Load(&model, "res/models/kiwi.fbx");
 
     obj = skRenderObject_CreateFromModel(
         &renderer, &model, "res/textures/image.bmp",
@@ -43,11 +43,11 @@ int main(int argc, char** argv)
     mat4 trans = GLM_MAT4_IDENTITY_INIT;
     glm_translate(trans, (vec3) {0.0f, 0.0f, 0.0f});
     glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
-    glm_scale(trans, (vec3) {0.001f, 0.001f, 0.001f});
+    glm_scale(trans, (vec3) {0.1f, 0.1f, 0.1f});
 
     glm_mat4_copy(trans, obj.transform);
     
-    skAnimation anim = skAnimation_Create("res/models/dancing_vampire.dae", &model);
+    skAnimation anim = skAnimation_Create("res/models/kiwi.fbx", &model);
 
     skAnimator animator = skAnimator_Create(&anim);
 

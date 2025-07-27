@@ -53,7 +53,6 @@ typedef struct
     skVector* loadedTextures;  // skTexture
     skVector* meshes;          // skMesh
     skMap*    boneInfoMap;     // char*, skBoneInfo
-    skMap*    boneNameToIndex; // char*, u32
     int       boneCount;
 } skModel;
 

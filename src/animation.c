@@ -13,9 +13,8 @@ skAnimation skAnimation_Create(const char* animationPath,
     animation.bones = skVector_Create(sizeof(skBone), 16);
     animation.boneInfoMap = model->boneInfoMap;
 
-    const struct aiScene* scene = aiImportFile(
-        animationPath, aiProcess_Triangulate | aiProcess_FlipUVs |
-                           aiProcess_CalcTangentSpace);
+    const struct aiScene* scene =
+        aiImportFile(animationPath, aiProcess_Triangulate);
 
     struct aiMatrix4x4 globalTransformation =
         scene->mRootNode->mTransformation;
@@ -104,9 +103,7 @@ void skAnimation_ReadMissingBones(skAnimation*              animation,
     for (int i = 0; i < size; i++)
     {
         const struct aiNodeAnim* channel = aiAnim->mChannels[i];
-        char                     boneName[128];
-        strcpy(boneName, channel->mNodeName.data);
-        const char* boneNamePtr = boneName;
+        const char* boneNamePtr = channel->mNodeName.data;
 
         // Check if bone exists in model's bone info map
         if (!skMap_Contains(model->boneInfoMap, &boneNamePtr))
@@ -248,14 +245,17 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
     skBone* bone =
         skAnimation_FindBone(animator->currentAnimation, node->name);
 
+    mat4 nodeTransform;
+    glm_mat4_copy(node->transformation, nodeTransform);
+
     if (bone)
     {
         skBone_Update(bone, animator->currentTime);
-        glm_mat4_copy(bone->localTransform, node->transformation);
+        glm_mat4_copy(bone->localTransform, nodeTransform);
     }
 
     mat4 globalTransformation;
-    glm_mat4_mul(parentTransform, node->transformation,
+    glm_mat4_mul(parentTransform, nodeTransform,
                  globalTransformation);
 
     const char* nodeName = &node->name;
@@ -281,8 +281,7 @@ void skAnimator_CalculateBoneTransform(skAnimator*       animator,
         skAssimpNodeData* nodeData =
             (skAssimpNodeData*)skVector_Get(node->children, i);
 
-        skAnimator_CalculateBoneTransform(
-            animator, nodeData,
-            globalTransformation);
+        skAnimator_CalculateBoneTransform(animator, nodeData,
+                                          globalTransformation);
     }
 }
