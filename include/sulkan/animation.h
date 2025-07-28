@@ -21,10 +21,12 @@ typedef struct skAnimation
     float duration;
     int ticksPerSecond;
     skAssimpNodeData rootNode;
-    mat4 inverseGlobalTransformation;
+    char name[128];
 } skAnimation;
 
-skAnimation skAnimation_Create(const char* animationPath, skModel* model);
+skAnimation skAnimation_Create(const struct aiAnimation* aiAnim,
+                               const struct aiNode* rootNode,
+                               skModel*    model);
 void skAnimation_Free(skAnimation* animation);
 skBone* skAnimation_FindBone(skAnimation* animation, const char* name);
 
@@ -36,12 +38,13 @@ void skAssimpNodeData_Free(skAssimpNodeData* nodeData);
 typedef struct skAnimator
 {
     skVector* finalBoneMatrices; // mat4
+    skVector* animations; // skAnimation
     skAnimation* currentAnimation;
     float currentTime;
     float deltaTime;
 } skAnimator;
 
-skAnimator skAnimator_Create(skAnimation* animation);
+skAnimator skAnimator_Create(skModel* model);
 void skAnimator_UpdateAnimation(skAnimator* animator, float dt);
 void skAnimator_PlayAnimation(skAnimator* animator, skAnimation* anim);
 void skAnimator_CalculateBoneTransform(skAnimator* animator, skAssimpNodeData* node, 

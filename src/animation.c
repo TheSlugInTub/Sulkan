@@ -5,7 +5,8 @@
 #include <assimp/matrix4x4.h>
 #include <assimp/vector3.h>
 
-skAnimation skAnimation_Create(const char* animationPath,
+skAnimation skAnimation_Create(const struct aiAnimation* aiAnim,
+                               const struct aiNode* rootNode,
                                skModel*    model)
 {
     skAnimation animation = {0};
@@ -13,32 +14,15 @@ skAnimation skAnimation_Create(const char* animationPath,
     animation.bones = skVector_Create(sizeof(skBone), 16);
     animation.boneInfoMap = model->boneInfoMap;
 
-    const struct aiScene* scene =
-        aiImportFile(animationPath, aiProcess_Triangulate);
-
-    struct aiMatrix4x4 globalTransformation =
-        scene->mRootNode->mTransformation;
-    aiMatrix4Inverse(&globalTransformation);
-    skAssimpMat4ToGLM(&globalTransformation,
-                      animation.inverseGlobalTransformation);
-
-    if (!scene || !scene->mRootNode || !scene->mNumAnimations)
-    {
-        printf("Error: Failed to load animation file: %s\n",
-               animationPath);
-        return animation;
-    }
-
-    const struct aiAnimation* aiAnim = scene->mAnimations[0];
     animation.duration = (float)aiAnim->mDuration;
     animation.ticksPerSecond = (int)aiAnim->mTicksPerSecond;
 
+    strcpy(animation.name, aiAnim->mName.data);
+
     skAnimation_ReadHierarchyData(&animation.rootNode,
-                                  scene->mRootNode);
+                                  rootNode);
 
     skAnimation_ReadMissingBones(&animation, aiAnim, model);
-
-    aiReleaseImport(scene);
 
     return animation;
 }
@@ -196,20 +180,44 @@ int skAnimation_IsValid(skAnimation* animation)
            animation->bones->size > 0 && animation->duration > 0.0f;
 }
 
-skAnimator skAnimator_Create(skAnimation* animation)
+skAnimator skAnimator_Create(skModel* model)
 {
     skAnimator anim = {0};
 
     anim.currentTime = 0.0f;
-    anim.currentAnimation = animation;
 
     anim.finalBoneMatrices = skVector_Create(sizeof(mat4), 100);
+    anim.animations = skVector_Create(sizeof(skAnimation), 1);
 
     for (int i = 0; i < 100; i++)
     {
         mat4 ident = GLM_MAT4_IDENTITY_INIT;
         skVector_PushBack(anim.finalBoneMatrices, &ident);
     }
+
+    const struct aiScene* scene =
+        aiImportFile(model->path, aiProcess_Triangulate);
+    
+    if (!scene || !scene->mRootNode || !scene->mNumAnimations)
+    {
+        printf("SK ERROR: Failed to load animation file: %s\n",
+               model->path);
+        return anim;
+    }
+
+    for (int i = 0; i < scene->mNumAnimations; i++)
+    {
+        const struct aiAnimation* aiAnim = scene->mAnimations[i];
+
+        skAnimation animation = skAnimation_Create(aiAnim, scene->mRootNode, model);
+
+        skVector_PushBack(anim.animations, &animation);
+    }
+    
+    skAnimation* firstAnim = (skAnimation*)skVector_Get(anim.animations, 0);
+    anim.currentAnimation = firstAnim;
+    
+    aiReleaseImport(scene);
 
     return anim;
 }

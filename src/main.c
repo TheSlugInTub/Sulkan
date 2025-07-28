@@ -47,9 +47,7 @@ int main(int argc, char** argv)
 
     glm_mat4_copy(trans, obj.transform);
     
-    skAnimation anim = skAnimation_Create("res/models/dancing_vampire.dae", &model);
-
-    skAnimator animator = skAnimator_Create(&anim);
+    skAnimator animator = skAnimator_Create(&model);
 
     obj.boneTransforms = animator.finalBoneMatrices;
 

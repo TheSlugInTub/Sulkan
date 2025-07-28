@@ -64,6 +64,8 @@ skModel skModel_Create()
 
 void skModel_Load(skModel* model, const char* path)
 {
+    strcpy(model->path, path);
+
     // Extract directory from path
     strncpy(model->directory, path, sizeof(model->directory) - 1);
     model->directory[sizeof(model->directory) - 1] = '\0';
