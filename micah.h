@@ -80,7 +80,7 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object,
                     skVector_Get(state->renderer->renderObjects,
                                  object->objectIndex);
                 *obj = skRenderObject_CreateFromModel(
-                    state->renderer, &model, object->texturePath,
+                    state->renderer, &model, 0, object->texturePath,
                     object->normalTexturePath, object->roughnessTexturePath);
 
                 VkDeviceSize bufferSize =

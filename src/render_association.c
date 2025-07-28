@@ -11,17 +11,15 @@ void skRenderAssociation_CreateRenderObject(
         skModel model = skModel_Create();
         skModel_Load(&model, assoc->modelPath);
 
-        obj = skRenderObject_CreateFromModel(state->renderer, &model,
-                                             assoc->texturePath, 
-                                             assoc->normalTexturePath,
-                                             assoc->roughnessTexturePath);
+        obj = skRenderObject_CreateFromModel(
+            state->renderer, &model, 0, assoc->texturePath,
+            assoc->normalTexturePath, assoc->roughnessTexturePath);
     }
     else if (assoc->type == skRenderObjectType_Sprite)
     {
-        obj = skRenderObject_CreateFromSprite(state->renderer,
-                                              assoc->texturePath,
-                                              assoc->normalTexturePath,
-                                              assoc->roughnessTexturePath);
+        obj = skRenderObject_CreateFromSprite(
+            state->renderer, assoc->texturePath,
+            assoc->normalTexturePath, assoc->roughnessTexturePath);
     }
 
     mat4 trans = GLM_MAT4_IDENTITY_INIT;
@@ -32,7 +30,7 @@ void skRenderAssociation_CreateRenderObject(
     glm_mat4_copy(trans, obj.transform);
 
     assoc->objectIndex = state->renderer->renderObjects->size;
-    
+
     skRenderer_AddRenderObject(state->renderer, &obj);
 }
 

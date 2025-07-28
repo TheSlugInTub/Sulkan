@@ -2644,9 +2644,11 @@ void skRenderer_CreateTexture(skRenderer*    renderer,
     }
 }
 
-skRenderObject skRenderObject_CreateFromModel(
-    skRenderer* renderer, skModel* model, const char* texturePath,
-    const char* normalTexturePath, const char* roughnessTexturePath)
+skRenderObject
+skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
+                               int meshIndex, const char* texturePath,
+                               const char* normalTexturePath,
+                               const char* roughnessTexturePath)
 {
     skRenderObject obj = {0};
 

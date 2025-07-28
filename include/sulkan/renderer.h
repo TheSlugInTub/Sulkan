@@ -251,7 +251,7 @@ void skRenderer_CreateDescriptorPool(skRenderer* renderer);
 void skRenderer_Destroy(skRenderer* renderer);
 
 skRenderObject skRenderObject_CreateFromModel(
-    skRenderer* renderer, skModel* model, const char* texturePath,
+    skRenderer* renderer, skModel* model, int meshIndex, const char* texturePath,
     const char* normalTexturePath, const char* roughnessTexturePath);
 skRenderObject
      skRenderObject_CreateFromSprite(skRenderer* renderer,
