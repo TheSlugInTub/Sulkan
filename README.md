@@ -51,3 +51,10 @@ iterators. You can then add this system using skECS_AddSystem. You can also spec
 whether this is a start system or a regular systems, both of which have seperate vectors
 and you can call both vectors with a function.
 There's also an ECS state struct you need to create to call the systems.
+
+# TODO
+
+- [ ] Make a new descriptor set layout for the lines.
+- [ ] Seperate line rendering, skybox rendering and object rendering in 
+skRenderer_RecordCommandBuffers
+- [ ] Fix error handling

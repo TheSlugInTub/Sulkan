@@ -841,6 +841,170 @@ void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
     }
 }
 
+void skRenderer_CreateLineGraphicsPipeline(skRenderer* renderer)
+{
+    u32   vertLen, fragLen;
+    char* vertShaderCode =
+        skReadFile("shaders/line_vert.spv", &vertLen);
+    char* fragShaderCode =
+        skReadFile("shaders/line_frag.spv", &fragLen);
+
+    VkShaderModule vertMod =
+        skCreateShaderModule(renderer, vertShaderCode, vertLen);
+    VkShaderModule fragMod =
+        skCreateShaderModule(renderer, fragShaderCode, fragLen);
+
+    VkPipelineShaderStageCreateInfo vertStage = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .module = vertMod,
+        .pName = "main"};
+
+    VkPipelineShaderStageCreateInfo fragStage = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .module = fragMod,
+        .pName = "main"};
+
+    VkPipelineShaderStageCreateInfo stages[] = {vertStage, fragStage};
+
+    VkVertexInputBindingDescription bindingDesc = {
+        .binding = 0,
+        .stride = sizeof(vec3),
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
+
+    VkVertexInputAttributeDescription attributeDesc = {
+        .binding = 0,
+        .location = 0,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = 0};
+
+    VkPipelineVertexInputStateCreateInfo vertexInput = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &bindingDesc,
+        .vertexAttributeDescriptionCount = 1,
+        .pVertexAttributeDescriptions = &attributeDesc};
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+        .primitiveRestartEnable = VK_FALSE};
+
+    VkPipelineViewportStateCreateInfo viewportState = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .scissorCount = 1};
+
+    // Rasterizer (enable wide lines)
+    VkPipelineRasterizationStateCreateInfo rasterizer = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = VK_POLYGON_MODE_FILL,
+        .lineWidth = 1.0f,
+        .cullMode = VK_CULL_MODE_NONE,
+        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .depthBiasEnable = VK_FALSE};
+
+    VkPipelineMultisampleStateCreateInfo multisampling = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .sampleShadingEnable = VK_FALSE,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
+
+    VkPipelineColorBlendAttachmentState blendAttachment = {
+        .colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        .blendEnable = VK_TRUE,
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp = VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+        .alphaBlendOp = VK_BLEND_OP_ADD};
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {
+        .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .attachmentCount = 1,
+        .pAttachments = &blendAttachment};
+
+    VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
+                                      VK_DYNAMIC_STATE_SCISSOR,
+                                      VK_DYNAMIC_STATE_LINE_WIDTH};
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = 3,
+        .pDynamicStates = dynamicStates};
+
+    VkPushConstantRange pushConstant = {
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .offset = 0,
+        .size = sizeof(vec3)};
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &renderer->descriptorSetLayout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushConstant};
+
+    if (vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo,
+                               NULL, &renderer->linePipelineLayout) !=
+        VK_SUCCESS)
+    {
+        printf("Failed to create line pipeline layout\n");
+    }
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = 2,
+        .pStages = stages,
+        .pVertexInputState = &vertexInput,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = renderer->linePipelineLayout,
+        .renderPass = renderer->renderPass,
+        .subpass = 0};
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
+    depthStencil.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.front = (VkStencilOpState) {0};
+    depthStencil.back = (VkStencilOpState) {0};
+
+    pipelineInfo.pDepthStencilState = &depthStencil;
+
+    if (vkCreateGraphicsPipelines(
+            renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL,
+            &renderer->linePipeline) != VK_SUCCESS)
+    {
+        printf("Failed to create line pipeline\n");
+    }
+
+    vkDestroyShaderModule(renderer->device, vertMod, NULL);
+    vkDestroyShaderModule(renderer->device, fragMod, NULL);
+}
+
 Bool skRenderer_CheckExtensionsSupported(VkPhysicalDevice device)
 {
     u32 extensionCount;
@@ -1176,10 +1340,10 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
     }
 
+    // Skybox rendering
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       renderer->skyboxPipeline);
 
-    // Bind vertex and index buffers for skybox
     VkBuffer vertexBuffers[] = {renderer->skyboxObject.vertexBuffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers,
@@ -1197,9 +1361,46 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         renderer->skyboxPipelineLayout, 0, 3, sets, 0, NULL);
 
-    // Draw the skybox
     vkCmdDrawIndexed(commandBuffer, renderer->skyboxObject.indexCount,
                      1, 0, 0, 0);
+
+    // Line rendering
+    if (renderer->lineObjects->size > 0)
+    {
+        vkCmdBindPipeline(commandBuffer,
+                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          renderer->linePipeline);
+
+        vkCmdSetLineWidth(commandBuffer, 1.0f);
+
+        for (size_t i = 0; i < renderer->lineObjects->size; i++)
+        {
+            skLineObject* line =
+                (skLineObject*)skVector_Get(renderer->lineObjects, i);
+
+            vkCmdSetLineWidth(commandBuffer, line->lineWidth);
+
+            vkCmdBindDescriptorSets(
+                commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                renderer->linePipelineLayout, 0, 1,
+                &line->descriptorSets[renderer->currentFrame], 0,
+                NULL);
+
+            vkCmdPushConstants(commandBuffer,
+                               renderer->linePipelineLayout,
+                               VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(vec3), &line->color);
+
+            VkBuffer     buffers[] = {line->vertexBuffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers,
+                                   offsets);
+            vkCmdBindIndexBuffer(commandBuffer, line->indexBuffer, 0,
+                                 VK_INDEX_TYPE_UINT32);
+
+            vkCmdDrawIndexed(commandBuffer, line->indexCount, 1, 0, 0, 0);
+        }
+    }
 
     if (editor != NULL)
     {
@@ -1522,6 +1723,29 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     memcpy(renderer->skyboxObject
                .uniformBuffersMap[renderer->currentFrame],
            &skyboxUbo, sizeof(skyboxUbo));
+
+    for (size_t i = 0; i < renderer->lineObjects->size; i++)
+    {
+        skLineObject* line =
+            (skLineObject*)skVector_Get(renderer->lineObjects, i);
+
+        skUniformBufferObject ubo = {0};
+
+        glm_mat4_copy(line->transform, ubo.model);
+
+        glm_mat4_copy(renderer->viewTransform, ubo.view);
+
+        mat4 proj;
+        glm_perspective(glm_rad(80.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.001f, 1000.0f, proj);
+        proj[1][1] *= -1.0f;
+        glm_mat4_copy(proj, ubo.proj);
+
+        memcpy(line->uniformBuffersMap[renderer->currentFrame], &ubo,
+               sizeof(ubo));
+    }
 }
 
 void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
@@ -1778,6 +2002,8 @@ void skRenderer_CreateLogicalDevice(skRenderer* renderer)
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
         VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
+
+    deviceFeatures.wideLines = VK_TRUE;
 
     VkDeviceCreateInfo deviceCreateInfo = {0};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -2480,6 +2706,7 @@ skRenderer skRenderer_Create(skWindow* window)
 
     renderer.renderObjects =
         skVector_Create(sizeof(skRenderObject), 10);
+    renderer.lineObjects = skVector_Create(sizeof(skLineObject), 1);
     renderer.lights = skVector_Create(sizeof(skLight), 10);
 
     skRenderer_CreateInstance(rendererPtr);
@@ -2493,6 +2720,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skRenderer_CreateDescriptorSetLayout(&renderer);
     skRenderer_CreateGraphicsPipeline(&renderer);
     skRenderer_CreateSkyboxGraphicsPipeline(&renderer);
+    skRenderer_CreateLineGraphicsPipeline(&renderer);
     skRenderer_CreateCommandPool(&renderer);
     skRenderer_CreateDepthResources(&renderer);
     skRenderer_CreateFramebuffers(&renderer);
@@ -2505,7 +2733,7 @@ skRenderer skRenderer_Create(skWindow* window)
     skModel_Load(&model, "res/models/sphere.fbx");
 
     renderer.skyboxObject = skRenderObject_CreateFromModel(
-        &renderer, &model, "res/textures/skybox.bmp",
+        &renderer, &model, 0, "res/textures/skybox.bmp",
         "res/textures/defualt_normal.bmp",
         "res/textures/default_roughness.bmp");
 
@@ -2733,7 +2961,6 @@ skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
         stbi_uc* pixels =
             stbi_load(texturePath, &texWidth, &texHeight,
                       &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels)
         {
@@ -2742,6 +2969,8 @@ skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
                 stbi_load("res/textures/image.bmp", &texWidth,
                           &texHeight, &texChannels, STBI_rgb_alpha);
         }
+        
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         VkBuffer       imageStagingBuffer;
         VkDeviceMemory imageStagingBufferMemory;
@@ -3364,4 +3593,142 @@ skRenderObject skRenderObject_CreateFromSprite(
     }
 
     return obj;
+}
+
+skLineObject skLineObject_Create(skRenderer* renderer, vec3* points,
+                                 u32* indices, u32 pointCount,
+                                 u32 indexCount, vec3 color,
+                                 float width)
+{
+    skLineObject line = {0};
+    line.vertexCount = pointCount;
+    line.indexCount = indexCount;
+    line.lineWidth = width;
+    glm_vec3_copy(color, line.color);
+
+    size_t bufferSize = sizeof(vec3) * pointCount;
+
+    VkBuffer       stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &stagingBuffer, &stagingMemory);
+
+    void* data;
+    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
+                &data);
+    memcpy(data, points, bufferSize);
+    vkUnmapMemory(renderer->device, stagingMemory);
+
+    skRenderer_CreateBuffer(renderer, bufferSize,
+                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &line.vertexBuffer,
+                            &line.vertexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, stagingBuffer, line.vertexBuffer,
+                          bufferSize);
+
+    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
+    vkFreeMemory(renderer->device, stagingMemory, NULL);
+
+    size_t         indexBufferSize = sizeof(u32) * indexCount;
+    VkBuffer       indexStagingBuffer;
+    VkDeviceMemory indexStagingMemory;
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                            &indexStagingBuffer, &indexStagingMemory);
+
+    void* indexData;
+    vkMapMemory(renderer->device, indexStagingMemory, 0,
+                indexBufferSize, 0, &indexData);
+    memcpy(indexData, indices, indexBufferSize);
+    vkUnmapMemory(renderer->device, indexStagingMemory);
+
+    skRenderer_CreateBuffer(renderer, indexBufferSize,
+                            VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            &line.indexBuffer,
+                            &line.indexBufferMemory);
+
+    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
+                          line.indexBuffer, indexBufferSize);
+
+    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
+    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
+
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        skRenderer_CreateBuffer(
+            renderer, sizeof(skUniformBufferObject),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &line.uniformBuffers[frame],
+            &line.uniformBuffersMemory[frame]);
+
+        vkMapMemory(renderer->device,
+                    line.uniformBuffersMemory[frame], 0,
+                    sizeof(skUniformBufferObject), 0,
+                    &line.uniformBuffersMap[frame]);
+    }
+
+    VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
+    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
+    {
+        layouts[i] = renderer->descriptorSetLayout;
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = renderer->descriptorPool;
+    allocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
+    allocInfo.pSetLayouts = layouts;
+
+    if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
+                                 line.descriptorSets) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to allocate descriptor sets for "
+               "object.");
+    }
+
+    // Update descriptor sets
+    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
+    {
+        VkDescriptorBufferInfo bufferInfo = {0};
+        bufferInfo.buffer = line.uniformBuffers[frame];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(skUniformBufferObject);
+
+        VkWriteDescriptorSet descriptorWrites[] = {{0}};
+
+        descriptorWrites[0].sType =
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = line.descriptorSets[frame];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType =
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
+                               0, NULL);
+    }
+
+    glm_mat4_identity(line.transform);
+
+    return line;
+}
+
+void skRenderer_AddLineObject(skRenderer*   renderer,
+                              skLineObject* line)
+{
+    skVector_PushBack(renderer->lineObjects, line);
 }

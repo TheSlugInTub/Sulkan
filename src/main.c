@@ -31,27 +31,20 @@ int main(int argc, char** argv)
     skEditor editor = {.ecsState = &ecsState};
     strcpy(editor.sceneName, "res/scenes/main_scene.json");
 
-    skRenderObject obj = {0};
+    vec3 cubePoints[8] = {{-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+                          {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
+                          {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+                          {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
+    u32  cubeIndices[24] = {
+        0, 1, 1, 2, 2, 3, 3, 0, // bottom
+        4, 5, 5, 6, 6, 7, 7, 4, // top
+        0, 4, 1, 5, 2, 6, 3, 7  // sides
+    };
 
-    skModel model = skModel_Create();
-    skModel_Load(&model, "res/models/dancing_vampire.dae");
+    skLineObject lineObj = skLineObject_Create(
+        &renderer, cubePoints, cubeIndices, 8, 24, (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
 
-    obj = skRenderObject_CreateFromModel(
-        &renderer, &model, "res/textures/vampire.png",
-        "res/textures/default_normal.bmp", "res/textures/default_roughness.bmp");
-
-    mat4 trans = GLM_MAT4_IDENTITY_INIT;
-    glm_translate(trans, (vec3) {0.0f, 0.0f, 1.0f});
-    glm_quat_rotate(trans, (vec3) {0.0f, 0.0f, 0.0f}, trans);
-    glm_scale(trans, (vec3) {0.1f, 0.1f, 0.1f});
-
-    glm_mat4_copy(trans, obj.transform);
-    
-    skAnimator animator = skAnimator_Create(&model);
-
-    obj.boneTransforms = animator.finalBoneMatrices;
-
-    skRenderer_AddRenderObject(&renderer, &obj);
+    skRenderer_AddLineObject(&renderer, &lineObj);
 
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
@@ -63,8 +56,6 @@ int main(int argc, char** argv)
     while (!skWindow_ShouldClose(&window))
     {
         skECS_UpdateSystems(&ecsState);
-
-        skAnimator_UpdateAnimation(&animator, ecsState.deltaTime);
 
         skRenderer_DrawFrame(&renderer, &editor);
 

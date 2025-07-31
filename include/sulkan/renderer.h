@@ -89,6 +89,27 @@ typedef struct skRenderObject
     mat4 transform;
 } skRenderObject;
 
+typedef struct skLineObject
+{
+    VkBuffer       vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer       indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    u32            vertexCount;
+    u32            indexCount;
+    
+    vec3           color;
+    float          lineWidth;
+    
+    VkDescriptorSet descriptorSets[SK_FRAMES_IN_FLIGHT];
+    VkBuffer        uniformBuffers[SK_FRAMES_IN_FLIGHT];
+    VkDeviceMemory  uniformBuffersMemory[SK_FRAMES_IN_FLIGHT];
+    void*           uniformBuffersMap[SK_FRAMES_IN_FLIGHT];
+
+    mat4 transform;
+} skLineObject;
+
 typedef struct skRenderer
 {
     skWindow*                window;
@@ -109,6 +130,8 @@ typedef struct skRenderer
     VkPipeline               pipeline;
     VkPipelineLayout         skyboxPipelineLayout;
     VkPipeline               skyboxPipeline;
+    VkPipelineLayout         linePipelineLayout;
+    VkPipeline               linePipeline;
     VkCommandPool            commandPool;
     skVector*                commandBuffers; // VkCommandBuffer
     skVector*                imageAvailableSemaphores; // VkSemaphore
@@ -119,6 +142,7 @@ typedef struct skRenderer
     VkDescriptorSetLayout    lightDescriptorSetLayout;
     VkDescriptorSetLayout    uniformDescriptorSetLayout;
     VkDescriptorSetLayout    bonesDescriptorSetLayout;
+    VkDescriptorSetLayout    lineDescriptorSetLayout;
     VkDescriptorPool         descriptorPool;
     VkImage                  depthImage;
     VkImageView              depthImageView;
@@ -126,6 +150,7 @@ typedef struct skRenderer
     mat4                     viewTransform;
     vec3                     viewPos;
     skVector*                renderObjects; // skRenderObject
+    skVector*                lineObjects; // skLineObject
     skVector*                lights;        // skLight
 
     skRenderObject skyboxObject;
@@ -262,4 +287,9 @@ void skRenderer_CreateDescriptorSetsForObject(skRenderer* renderer,
                                               skRenderObject* obj);
 void skRenderer_AddRenderObject(skRenderer*     renderer,
                                 skRenderObject* object);
+void skRenderer_AddLineObject(skRenderer* renderer, skLineObject* line);
 void skRenderer_AddLight(skRenderer* renderer, skLight* light);
+
+skLineObject skLineObject_Create(skRenderer* renderer, vec3* points, u32* indices,
+                                 u32 pointCount, u32 indexCount, vec3 color,
+                                 float width);
