@@ -10,6 +10,8 @@ int main(int argc, char** argv)
 
     skRenderer_InitImGui(&renderer);
 
+    // skPhysics3DState physicsState = skPhysics3DState_Create();
+
     skSceneHandle scene = skECS_CreateScene();
 
     float fps = 0.0f;
@@ -50,12 +52,16 @@ int main(int argc, char** argv)
     skECS_AddSystem(skRenderAssociation_StartSys, true);
     skECS_AddSystem(skLightAssociation_StartSys, true);
     skECS_AddSystem(skDeltaTimeSystem, false);
+    // skECS_AddSystem(skRigidbody3D_StartSys, true);
+    // skECS_AddSystem(skRigidbody3D_Sys, false);
 
     skECS_StartStartSystems(&ecsState);
 
     while (!skWindow_ShouldClose(&window))
     {
         skECS_UpdateSystems(&ecsState);
+
+        // skPhysics3DState_Step(&physicsState, ecsState.deltaTime);
 
         skRenderer_DrawFrame(&renderer, &editor);
 

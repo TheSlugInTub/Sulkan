@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Set the project name
-project(Sulkan)
+project(Sulkan C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -45,9 +45,8 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/glfw3.lib
         ${CMAKE_SOURCE_DIR}/lib/assimp-vc143-mt.lib
+        ${CMAKE_SOURCE_DIR}/lib/joltc.lib
         D:/VulkanSDK/Lib/vulkan-1.lib
-        gdi32
-        user32
     )
 endif()
 

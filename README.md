@@ -58,3 +58,6 @@ There's also an ECS state struct you need to create to call the systems.
 - [ ] Seperate line rendering, skybox rendering and object rendering in 
 skRenderer_RecordCommandBuffers
 - [ ] Fix error handling
+- [ ] Fix object layers and broad phase layers in physics_3d
+- [ ] Split skPhysics3dState_CreateBody function into multiple types of colliders
+- [ ] Fix micah formatting
