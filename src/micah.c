@@ -24,19 +24,146 @@ void skName_LoadComponent(skName* object, skJson j)
     skJson_LoadString(j, "name", object->name);
 }
 
-void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* state)
+// IGNORE
+void skRenderAssociation_DrawComponent(skRenderAssociation* object,
+                                       skECSState*          state)
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
     {
+        if (skImGui_Button(
+                "Create skRenderObject for this skRenderAssociation"))
+        {
+            skRenderAssociation_CreateRenderObject(object, state);
+        }
+
+        if (skImGui_Button("Remove skRenderObject"))
+        {
+            skVector_Remove(state->renderer->renderObjects,
+                            object->objectIndex);
+        }
+
         skImGui_InputInt("objectIndex", &object->objectIndex);
-        skImGui_InputInt("type", &object->type);
-        skImGui_InputText("modelPath", object->modelPath, 128, 0);
-        skImGui_InputText("texturePath", object->texturePath, 128, 0);
-        skImGui_InputText("normalTexturePath", object->normalTexturePath, 128, 0);
-        skImGui_InputText("roughnessTexturePath", object->roughnessTexturePath, 128, 0);
-        skImGui_DragFloat3("position", object->position, 0.1f);
-        skImGui_DragFloat4("rotation", object->rotation, 0.1f);
-        skImGui_DragFloat3("scale", object->scale, 0.1f);
+
+        const char* types[] = {"Model", "Sprite"};
+        int         currentType = (int)object->type;
+
+        if (skImGui_ComboBox("renderObjectType", types, &currentType,
+                             2))
+        {
+            object->type = currentType;
+        }
+
+        if (object->type == skRenderObjectType_Model)
+        {
+            skImGui_InputText("modelPath", object->modelPath, 128, 0);
+            skImGui_InputText("texturePath", object->texturePath, 128,
+                              0);
+            skImGui_InputText("normalTexturePath",
+                              object->normalTexturePath, 128, 0);
+            skImGui_InputText("roughnessTexturePath",
+                              object->roughnessTexturePath, 128, 0);
+
+            if (skImGui_Button("Update Model"))
+            {
+                skModel model = skModel_Create();
+                skModel_Load(&model, object->modelPath);
+
+                skRenderObject* obj =
+                    (skRenderObject*)skVector_Get(state->renderer->renderObjects,
+                                 object->objectIndex);
+                *obj = skRenderObject_CreateFromModel(
+                    state->renderer, &model, 0, object->texturePath,
+                    object->normalTexturePath, object->roughnessTexturePath);
+
+                VkDeviceSize bufferSize =
+                    sizeof(skUniformBufferObject);
+
+                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT;
+                     frame++)
+                {
+                    skRenderer_CreateBuffer(
+                        state->renderer, bufferSize,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &obj->uniformBuffers[frame],
+                        &obj->uniformBuffersMemory[frame]);
+
+                    vkMapMemory(state->renderer->device,
+                                obj->uniformBuffersMemory[frame], 0,
+                                bufferSize, 0,
+                                &obj->uniformBuffersMap[frame]);
+                }
+
+                skRenderer_CreateDescriptorSetsForObject(
+                    state->renderer, obj);
+
+                mat4 trans = GLM_MAT4_IDENTITY_INIT;
+                glm_translate(trans, object->position);
+                glm_quat_rotate(trans, object->rotation, trans);
+                glm_scale(trans, object->scale);
+
+                glm_mat4_copy(trans, obj->transform);
+            }
+        }
+        if (object->type == skRenderObjectType_Sprite)
+        {
+            skImGui_InputText("texturePath", object->texturePath, 128,
+                              0);
+            skImGui_InputText("normalTexturePath",
+                              object->normalTexturePath, 128, 0);
+            skImGui_InputText("roughnessTexturePath",
+                              object->roughnessTexturePath, 128, 0);
+
+            if (skImGui_Button("Update Sprite"))
+            {
+                skRenderObject* obj =
+                    (skRenderObject*)skVector_Get(state->renderer->renderObjects,
+                                 object->objectIndex);
+                *obj = skRenderObject_CreateFromSprite(
+                    state->renderer, object->texturePath,
+                    object->normalTexturePath, object->roughnessTexturePath);
+
+                VkDeviceSize bufferSize =
+                    sizeof(skUniformBufferObject);
+
+                for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT;
+                     frame++)
+                {
+                    skRenderer_CreateBuffer(
+                        state->renderer, bufferSize,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &obj->uniformBuffers[frame],
+                        &obj->uniformBuffersMemory[frame]);
+
+                    vkMapMemory(state->renderer->device,
+                                obj->uniformBuffersMemory[frame], 0,
+                                bufferSize, 0,
+                                &obj->uniformBuffersMap[frame]);
+                }
+
+                skRenderer_CreateDescriptorSetsForObject(
+                    state->renderer, obj);
+            }
+        }
+
+        skRenderObject* obj = (skRenderObject*)skVector_Get(
+            state->renderer->renderObjects, object->objectIndex);
+
+        if ((skImGui_DragFloat3("position", object->position, 0.1f) ||
+             skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
+             skImGui_DragFloat3("scale", object->scale, 0.1f)) &&
+            obj != NULL)
+        {
+            mat4 trans = GLM_MAT4_IDENTITY_INIT;
+            glm_translate(trans, object->position);
+            glm_quat_rotate(trans, object->rotation, trans);
+            glm_scale(trans, object->scale);
+
+            glm_mat4_copy(trans, obj->transform);
+        }
     }
 }
 
@@ -69,15 +196,37 @@ void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
     skJson_LoadFloat3(j, "scale", object->scale);
 }
 
-void skLightAssociation_DrawComponent(skLightAssociation* object, skECSState* state)
+// IGNORE
+void skLightAssociation_DrawComponent(skLightAssociation* object,
+                                      skECSState*         state)
 {
     if (skImGui_CollapsingHeader("skLightAssociation"))
     {
+        if (skImGui_Button("Create skLight for this association"))
+        {
+            skLightAssociation_CreateLight(object, state);
+        }
+
+        if (skImGui_Button("Destroy skLight"))
+        {
+            skVector_Remove(state->renderer->lights,
+                            object->lightIndex);
+        }
+
         skImGui_InputInt("lightIndex", &object->lightIndex);
-        skImGui_DragFloat3("position", object->position, 0.1f);
-        skImGui_DragFloat3("color", object->color, 0.1f);
-        skImGui_DragFloat("radius", &object->radius, 0.1f);
-        skImGui_DragFloat("intensity", &object->intensity, 0.1f);
+
+        if (skImGui_DragFloat3("position", object->position, 0.1f) ||
+            skImGui_DragFloat3("color", object->color, 0.1f) ||
+            skImGui_DragFloat("radius", &object->radius, 0.1f) ||
+            skImGui_DragFloat("intensity", &object->intensity, 0.1f))
+        {
+            skLight* light = (skLight*)skVector_Get(state->renderer->lights,
+                                          object->lightIndex);
+            light->intensity = object->intensity;
+            light->radius = object->radius;
+            glm_vec3_copy(object->position, light->position);
+            glm_vec3_copy(object->color, light->color);
+        }
     }
 }
 

@@ -71,6 +71,10 @@ skPhysics3DState skPhysics3DState_Create()
     state.settings.objectVsBroadPhaseLayerFilter =
         state.objectVsBroadPhaseLayerFilter;
     state.system = JPH_PhysicsSystem_Create(&state.settings);
+
+    JPH_Vec3 gravity = (JPH_Vec3) {0.0f, -9.81f, 0.0f};
+    JPH_PhysicsSystem_SetGravity(state.system, &gravity);
+
     state.bodyInterface =
         JPH_PhysicsSystem_GetBodyInterface(state.system);
     state.bodyInterfaceNoLock =
@@ -83,7 +87,7 @@ void skPhysics3DState_Step(skPhysics3DState* state, float dt)
 {
     const int cCollisionSteps = 1;
 
-    JPH_PhysicsSystem_Update(state->system, 2 * dt, cCollisionSteps,
+    JPH_PhysicsSystem_Update(state->system, dt, cCollisionSteps,
                              state->jobSystem);
 }
 
@@ -114,8 +118,7 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                 &halfExtents, JPH_DEFAULT_CONVEX_RADIUS);
 
             vec4 glmQuat;
-
-            glm_euler_xyz_quat(assoc->rotation, glmQuat);
+            glm_vec4_copy(assoc->rotation, glmQuat);
 
             JPH_Quat quat = (JPH_Quat) {glmQuat[0], glmQuat[1],
                                         glmQuat[2], glmQuat[3]};
@@ -211,7 +214,7 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
 
             // Quaternion for rotation
             vec4 glmQuat;
-            glm_euler_xyz_quat(assoc->rotation, glmQuat);
+            glm_vec4_copy(assoc->rotation, glmQuat);
 
             JPH_Quat quat = (JPH_Quat) {glmQuat[0], glmQuat[1],
                                         glmQuat[2], glmQuat[3]};
@@ -272,7 +275,8 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             //      meshIdx++)
             // {
             //     skMesh* mesh =
-            //         (skMesh*)smVector_Get(assoc->->meshes, meshIdx);
+            //         (skMesh*)smVector_Get(assoc->->meshes,
+            //         meshIdx);
             //     totalTriangles += mesh->indices->size / 3;
             // }
 
@@ -299,10 +303,13 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             //     for (size_t i = 0; i < numTriangles; i++)
             //     {
             //         unsigned int idx0 =
-            //             *(unsigned int*)smVector_Get(indices, i * 3);
-            //         unsigned int idx1 = *(unsigned int*)smVector_Get(
+            //             *(unsigned int*)smVector_Get(indices, i *
+            //             3);
+            //         unsigned int idx1 = *(unsigned
+            //         int*)smVector_Get(
             //             indices, i * 3 + 1);
-            //         unsigned int idx2 = *(unsigned int*)smVector_Get(
+            //         unsigned int idx2 = *(unsigned
+            //         int*)smVector_Get(
             //             indices, i * 3 + 2);
 
             //         smVertex* v0 =
@@ -312,15 +319,20 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             //         smVertex* v2 =
             //             (smVertex*)smVector_Get(vertices, idx2);
 
-            //         triangles[triangleIndex].v1.x = v0->position[0];
-            //         triangles[triangleIndex].v1.y = v0->position[1];
-            //         triangles[triangleIndex].v1.z = v0->position[2];
-            //         triangles[triangleIndex].v2.x = v1->position[0];
-            //         triangles[triangleIndex].v2.y = v1->position[1];
-            //         triangles[triangleIndex].v2.z = v1->position[2];
-            //         triangles[triangleIndex].v3.x = v2->position[0];
-            //         triangles[triangleIndex].v3.y = v2->position[1];
-            //         triangles[triangleIndex].v3.z = v2->position[2];
+            //         triangles[triangleIndex].v1.x =
+            //         v0->position[0]; triangles[triangleIndex].v1.y
+            //         = v0->position[1];
+            //         triangles[triangleIndex].v1.z =
+            //         v0->position[2]; triangles[triangleIndex].v2.x
+            //         = v1->position[0];
+            //         triangles[triangleIndex].v2.y =
+            //         v1->position[1]; triangles[triangleIndex].v2.z
+            //         = v1->position[2];
+            //         triangles[triangleIndex].v3.x =
+            //         v2->position[0]; triangles[triangleIndex].v3.y
+            //         = v2->position[1];
+            //         triangles[triangleIndex].v3.z =
+            //         v2->position[2];
             //         triangles[triangleIndex].materialIndex = 0;
             //         triangleIndex++;
             //     }
@@ -380,7 +392,11 @@ void skRigidbody3D_Sys(skECSState* state)
         JPH_RVec3 pos;
         JPH_Quat  rot;
         JPH_BodyInterface_GetPositionAndRotation(
-            state->physics3dState->bodyInterface, rigid->bodyID, &pos, &rot);
+            state->physics3dState->bodyInterface, rigid->bodyID, &pos,
+            &rot);
+
+        skRenderObject* obj = (skRenderObject*)skVector_Get(
+            state->renderer->renderObjects, assoc->objectIndex);
 
         assoc->position[0] = pos.x;
         assoc->position[1] = pos.y;
@@ -390,6 +406,13 @@ void skRigidbody3D_Sys(skECSState* state)
         assoc->rotation[1] = rot.y;
         assoc->rotation[2] = rot.z;
         assoc->rotation[3] = rot.w;
+
+        mat4 trans = GLM_MAT4_IDENTITY_INIT;
+        glm_translate(trans, assoc->position);
+        glm_quat_rotate(trans, assoc->rotation, trans);
+        glm_scale(trans, assoc->scale);
+
+        glm_mat4_copy(trans, obj->transform);
     }
     SK_ECS_ITER_END();
 }
@@ -404,7 +427,8 @@ void skRigidbody3D_StartSys(skECSState* state)
         skRenderAssociation* assoc =
             SK_ECS_GET(state->scene, _entity, skRenderAssociation);
 
-        skPhysics3DState_CreateBody(state->physics3dState, rigid, assoc);
+        skPhysics3DState_CreateBody(state->physics3dState, rigid,
+                                    assoc);
     }
     SK_ECS_ITER_END();
 }

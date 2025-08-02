@@ -12,13 +12,13 @@
             "position": [
                 0.0,
                 0.0,
-                -0.800000011920929
+                -1.5
             ],
             "rotation": [
                 0.0,
                 0.0,
                 0.0,
-                0.0
+                1.0
             ],
             "roughnessTexturePath": "",
             "scale": [
@@ -28,6 +28,25 @@
             ],
             "texturePath": "res/textures/image.bmp",
             "type": 0
+        },
+        {
+            "angularDamping": 1.0,
+            "bodyType": 0,
+            "boxHalfwidths": [
+                5.0,
+                0.5,
+                5.0
+            ],
+            "capsuleHeight": 0.0,
+            "capsuleRadius": 0.0,
+            "colliderType": 0,
+            "componentType": "skRigidbody3D",
+            "fixedRotation": false,
+            "friction": 1.0,
+            "linearDamping": 1.0,
+            "mass": 1.0,
+            "restitution": 1.0,
+            "sphereRadius": 0.0
         }
     ],
     [
@@ -64,14 +83,14 @@
             "objectIndex": 1,
             "position": [
                 0.0,
-                0.0,
-                0.8999999761581421
+                0.3,
+                10.0
             ],
             "rotation": [
                 0.0,
                 0.0,
                 0.0,
-                0.0
+                1.0
             ],
             "roughnessTexturePath": "",
             "scale": [
@@ -81,6 +100,75 @@
             ],
             "texturePath": "res/textures/image.bmp",
             "type": 0
+        },
+        {
+            "angularDamping": 0.10000000149011612,
+            "bodyType": 1,
+            "boxHalfwidths": [
+                0.40000000298023224,
+                0.40000000298023224,
+                0.40000000298023224
+            ],
+            "capsuleHeight": 0.0,
+            "capsuleRadius": 0.0,
+            "colliderType": 0,
+            "componentType": "skRigidbody3D",
+            "fixedRotation": false,
+            "friction": 0.10000000149011612,
+            "linearDamping": 0.10000000149011612,
+            "mass": 1.0,
+            "restitution": 0.10000000149011612,
+            "sphereRadius": 0.0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "Box"
+        },
+        {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/box.fbx",
+            "normalTexturePath": "",
+            "objectIndex": 1,
+            "position": [
+                0.0,
+                0.0,
+                9.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "roughnessTexturePath": "",
+            "scale": [
+                0.4000000059604645,
+                0.4000000059604645,
+                0.4000000059604645
+            ],
+            "texturePath": "res/textures/image.bmp",
+            "type": 0
+        },
+        {
+            "angularDamping": 0.10000000149011612,
+            "bodyType": 1,
+            "boxHalfwidths": [
+                0.40000000298023224,
+                0.40000000298023224,
+                0.40000000298023224
+            ],
+            "capsuleHeight": 0.0,
+            "capsuleRadius": 0.0,
+            "colliderType": 0,
+            "componentType": "skRigidbody3D",
+            "fixedRotation": false,
+            "friction": 0.10000000149011612,
+            "linearDamping": 0.10000000149011612,
+            "mass": 1.0,
+            "restitution": 0.10000000149011612,
+            "sphereRadius": 0.0
         }
     ]
 ]

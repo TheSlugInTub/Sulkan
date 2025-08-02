@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 
     skRenderer_InitImGui(&renderer);
 
-    // skPhysics3DState physicsState = skPhysics3DState_Create();
+    skPhysics3DState physicsState = skPhysics3DState_Create();
 
     skSceneHandle scene = skECS_CreateScene();
 
@@ -28,7 +28,8 @@ int main(int argc, char** argv)
     skECSState ecsState = {.scene = scene,
                            .renderer = &renderer,
                            .camera = &camera,
-                           .window = &window};
+                           .window = &window,
+                           .physics3dState = &physicsState};
 
     skEditor editor = {.ecsState = &ecsState};
     strcpy(editor.sceneName, "res/scenes/main_scene.json");
@@ -52,8 +53,8 @@ int main(int argc, char** argv)
     skECS_AddSystem(skRenderAssociation_StartSys, true);
     skECS_AddSystem(skLightAssociation_StartSys, true);
     skECS_AddSystem(skDeltaTimeSystem, false);
-    // skECS_AddSystem(skRigidbody3D_StartSys, true);
-    // skECS_AddSystem(skRigidbody3D_Sys, false);
+    skECS_AddSystem(skRigidbody3D_StartSys, true);
+    skECS_AddSystem(skRigidbody3D_Sys, false);
 
     skECS_StartStartSystems(&ecsState);
 
@@ -61,7 +62,7 @@ int main(int argc, char** argv)
     {
         skECS_UpdateSystems(&ecsState);
 
-        // skPhysics3DState_Step(&physicsState, ecsState.deltaTime);
+        skPhysics3DState_Step(&physicsState, ecsState.deltaTime);
 
         skRenderer_DrawFrame(&renderer, &editor);
 
