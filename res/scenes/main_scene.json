@@ -34,8 +34,8 @@
             "bodyType": 0,
             "boxHalfwidths": [
                 5.0,
-                0.5,
-                5.0
+                5.0,
+                0.5
             ],
             "capsuleHeight": 0.0,
             "capsuleRadius": 0.0,

@@ -72,7 +72,7 @@ skPhysics3DState skPhysics3DState_Create()
         state.objectVsBroadPhaseLayerFilter;
     state.system = JPH_PhysicsSystem_Create(&state.settings);
 
-    JPH_Vec3 gravity = (JPH_Vec3) {0.0f, -9.81f, 0.0f};
+    JPH_Vec3 gravity = (JPH_Vec3) {0.0f, 0.0f, -9.81f};
     JPH_PhysicsSystem_SetGravity(state.system, &gravity);
 
     state.bodyInterface =

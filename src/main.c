@@ -62,7 +62,10 @@ int main(int argc, char** argv)
     {
         skECS_UpdateSystems(&ecsState);
 
-        skPhysics3DState_Step(&physicsState, ecsState.deltaTime);
+        if (editor.playing)
+        {
+            skPhysics3DState_Step(&physicsState, ecsState.deltaTime);
+        }
 
         skRenderer_DrawFrame(&renderer, &editor);
 
