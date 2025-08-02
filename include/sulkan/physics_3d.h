@@ -6,6 +6,8 @@
 #include <cglm/cglm.h>
 #include <sulkan/render_association.h>
 
+#define SK_DEBUG
+
 typedef struct skPhysics3DState
 {
     JPH_JobSystem*                     jobSystem;
@@ -49,6 +51,10 @@ typedef struct skRigidbody3D
     float capsuleHeight;
 
     JPH_BodyID bodyID;
+
+#ifdef SK_DEBUG
+    int lineIndex;
+#endif
 } skRigidbody3D;
 
 void             skPhysics3DTraceImpl(const char* message);
@@ -56,8 +62,10 @@ skPhysics3DState skPhysics3DState_Create();
 void             skPhysics3DState_Step(skPhysics3DState* state, float dt);
 void             skPhysics3DState_Destroy(skPhysics3DState* state);
 void             skPhysics3DState_ClearWorld(skPhysics3DState* state);
-void             skPhysics3DState_CreateBody(skPhysics3DState* state, skRigidbody3D* rigid,
-        skRenderAssociation* assoc);
+void skPhysics3DState_CreateBody(skPhysics3DState*    state,
+                                 skECSState*          ecsState,
+                                 skRigidbody3D*       rigid,
+                                 skRenderAssociation* assoc);
 
 void skRigidbody3D_Sys(skECSState* state);
 void skRigidbody3D_StartSys(skECSState* state);

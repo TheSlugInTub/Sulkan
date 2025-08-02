@@ -100,6 +100,7 @@ void skPhysics3DState_ClearWorld(skPhysics3DState* state)
 }
 
 void skPhysics3DState_CreateBody(skPhysics3DState*    state,
+                                 skECSState*          ecsState,
                                  skRigidbody3D*       rigid,
                                  skRenderAssociation* assoc)
 {
@@ -154,6 +155,28 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                      : JPH_Activation_Activate);
 
             JPH_BodyCreationSettings_Destroy(settings);
+
+#ifdef SK_DEBUG
+            vec3 cubePoints[8] = {
+                {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+                {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
+                {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+                {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
+            u32 cubeIndices[24] = {
+                0, 1, 1, 2, 2, 3, 3, 0, // bottom
+                4, 5, 5, 6, 6, 7, 7, 4, // top
+                0, 4, 1, 5, 2, 6, 3, 7  // sides
+            };
+
+            skLineObject line = skLineObject_Create(
+                ecsState->renderer, cubePoints, cubeIndices, 8, 24,
+                (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
+
+            skRenderer_AddLineObject(ecsState->renderer, &line);
+
+            rigid->lineIndex = 
+                ecsState->renderer->lineObjects->size - 1;
+#endif
             break;
         }
         case skCollider3DType_Sphere:
@@ -196,6 +219,28 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                      : JPH_Activation_Activate);
 
             JPH_BodyCreationSettings_Destroy(settings);
+
+#ifdef SK_DEBUG
+            vec3 cubePoints[8] = {
+                {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+                {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
+                {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+                {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
+            u32 cubeIndices[24] = {
+                0, 1, 1, 2, 2, 3, 3, 0, // bottom
+                4, 5, 5, 6, 6, 7, 7, 4, // top
+                0, 4, 1, 5, 2, 6, 3, 7  // sides
+            };
+
+            skLineObject line = skLineObject_Create(
+                ecsState->renderer, cubePoints, cubeIndices, 8, 24,
+                (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
+
+            skRenderer_AddLineObject(ecsState->renderer, &line);
+
+            rigid->lineIndex = 
+                ecsState->renderer->lineObjects->size - 1;
+#endif
             break;
         }
         case skCollider3DType_Capsule:
@@ -254,6 +299,28 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
 
             // Clean up
             JPH_BodyCreationSettings_Destroy(settings);
+
+#ifdef SK_DEBUG
+            vec3 cubePoints[8] = {
+                {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+                {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
+                {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+                {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
+            u32 cubeIndices[24] = {
+                0, 1, 1, 2, 2, 3, 3, 0, // bottom
+                4, 5, 5, 6, 6, 7, 7, 4, // top
+                0, 4, 1, 5, 2, 6, 3, 7  // sides
+            };
+
+            skLineObject line = skLineObject_Create(
+                ecsState->renderer, cubePoints, cubeIndices, 8, 24,
+                (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
+
+            skRenderer_AddLineObject(ecsState->renderer, &line);
+
+            rigid->lineIndex = 
+                ecsState->renderer->lineObjects->size - 1;
+#endif
             break;
         }
         case skCollider3DType_Mesh:
@@ -413,6 +480,42 @@ void skRigidbody3D_Sys(skECSState* state)
         glm_scale(trans, assoc->scale);
 
         glm_mat4_copy(trans, obj->transform);
+
+#ifdef SK_DEBUG
+        skLineObject* line = skVector_Get(state->renderer->lineObjects, 
+                rigid->lineIndex);
+
+        switch (rigid->colliderType)
+        {
+            case skCollider3DType_Box:
+            {
+                glm_scale(trans, rigid->boxHalfwidths);
+                glm_mat4_copy(trans, line->transform);
+                break;
+            }
+            case skCollider3DType_Sphere:
+            {
+                glm_scale(trans, (vec3) {rigid->sphereRadius,
+                                         rigid->sphereRadius,
+                                         rigid->sphereRadius});
+                glm_mat4_copy(trans, line->transform);
+                break;
+            }
+            case skCollider3DType_Capsule:
+            {
+                glm_scale(trans, (vec3) {rigid->capsuleRadius,
+                                         rigid->capsuleRadius,
+                                         rigid->capsuleHeight});
+                glm_mat4_copy(trans, line->transform);
+                break;
+            }
+            case skCollider3DType_Mesh:
+            {
+                // TODO
+                break;
+            }
+        }
+#endif
     }
     SK_ECS_ITER_END();
 }
@@ -427,8 +530,8 @@ void skRigidbody3D_StartSys(skECSState* state)
         skRenderAssociation* assoc =
             SK_ECS_GET(state->scene, _entity, skRenderAssociation);
 
-        skPhysics3DState_CreateBody(state->physics3dState, rigid,
-                                    assoc);
+        skPhysics3DState_CreateBody(state->physics3dState, state,
+                                    rigid, assoc);
     }
     SK_ECS_ITER_END();
 }

@@ -34,21 +34,6 @@ int main(int argc, char** argv)
     skEditor editor = {.ecsState = &ecsState};
     strcpy(editor.sceneName, "res/scenes/main_scene.json");
 
-    vec3 cubePoints[8] = {{-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
-                          {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
-                          {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
-                          {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
-    u32  cubeIndices[24] = {
-        0, 1, 1, 2, 2, 3, 3, 0, // bottom
-        4, 5, 5, 6, 6, 7, 7, 4, // top
-        0, 4, 1, 5, 2, 6, 3, 7  // sides
-    };
-
-    skLineObject lineObj = skLineObject_Create(
-        &renderer, cubePoints, cubeIndices, 8, 24, (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
-
-    skRenderer_AddLineObject(&renderer, &lineObj);
-
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);
     skECS_AddSystem(skLightAssociation_StartSys, true);

@@ -82,7 +82,7 @@ float lastX = 0.0f, lastY = 0.0f;
 
 void skCamera_Sys(skECSState* state)
 {
-    float speed = 1.0f * state->deltaTime;
+    float speed = 4.0f * state->deltaTime;
 
     vec3 forward, right;
     glm_vec3_copy(state->camera->front, forward);
