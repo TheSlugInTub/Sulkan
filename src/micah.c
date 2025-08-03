@@ -1,9 +1,10 @@
 #include "../micah.h"
+
 // micah.c
 // Procedurally generated source file for the Sulkan game engine
 // This contains drawer/serializer/deserializer functions for all registered components
 
-void skName_DrawComponent(skName* object, skECSState* state)
+void skName_DrawComponent(skName* object, skECSState* state, skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skName"))
     {
@@ -26,7 +27,8 @@ void skName_LoadComponent(skName* object, skJson j)
 
 // IGNORE
 void skRenderAssociation_DrawComponent(skRenderAssociation* object,
-                                       skECSState*          state)
+                                       skECSState*          state,
+                                       skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
     {
@@ -198,7 +200,8 @@ void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
 
 // IGNORE
 void skLightAssociation_DrawComponent(skLightAssociation* object,
-                                      skECSState*         state)
+                                      skECSState*         state,
+                                      skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skLightAssociation"))
     {
@@ -251,7 +254,8 @@ void skLightAssociation_LoadComponent(skLightAssociation* object, skJson j)
     skJson_LoadFloat(j, "intensity", &object->intensity);
 }
 
-void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state)
+// IGNORE
+void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state, skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skRigidbody3D"))
     {
@@ -266,6 +270,14 @@ void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state)
         skImGui_DragFloat("sphereRadius", &object->sphereRadius, 0.1f);
         skImGui_DragFloat("capsuleRadius", &object->capsuleRadius, 0.1f);
         skImGui_DragFloat("capsuleHeight", &object->capsuleHeight, 0.1f);
+        
+        if (skImGui_Button("Create Jolt body for this skRigidbody3D"))
+        {   
+            skRenderAssociation* assoc = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+            skPhysics3DState_CreateBody(state->physics3dState, state,
+                                        object, assoc);
+            object->created = true;
+        }
     }
 }
 
@@ -310,28 +322,28 @@ void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
 
     if (skNameObj != NULL)
     {
-        skName_DrawComponent(skNameObj, state);
+        skName_DrawComponent(skNameObj, state, ent);
     }
 
     skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
     if (skRenderAssociationObj != NULL)
     {
-        skRenderAssociation_DrawComponent(skRenderAssociationObj, state);
+        skRenderAssociation_DrawComponent(skRenderAssociationObj, state, ent);
     }
 
     skLightAssociation* skLightAssociationObj = SK_ECS_GET(state->scene, ent, skLightAssociation);
 
     if (skLightAssociationObj != NULL)
     {
-        skLightAssociation_DrawComponent(skLightAssociationObj, state);
+        skLightAssociation_DrawComponent(skLightAssociationObj, state, ent);
     }
 
     skRigidbody3D* skRigidbody3DObj = SK_ECS_GET(state->scene, ent, skRigidbody3D);
 
     if (skRigidbody3DObj != NULL)
     {
-        skRigidbody3D_DrawComponent(skRigidbody3DObj, state);
+        skRigidbody3D_DrawComponent(skRigidbody3DObj, state, ent);
     }
 
 }

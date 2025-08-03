@@ -381,7 +381,7 @@ void CreateSource(std::vector<Structure>& structures, char** args,
     auto          ignoredFuncMap = ExtractIgnoredFunctions("src/micah.c");
     std::ofstream sourceFile("src/micah.c");
 
-    sourceFile << "#include \"../micah.h\"";
+    sourceFile << "#include \"../micah.h\"\n";
 
     sourceFile << "\n// micah.c\n";
     sourceFile << "// Procedurally generated source file for the "
@@ -411,7 +411,7 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         {
             sourceFile << "void " << structure.identifier
                        << "_DrawComponent(" << structure.identifier
-                       << "* object, skECSState* state)\n{\n";
+                       << "* object, skECSState* state, skEntityID ent)\n{\n";
 
             sourceFile << "    if (skImGui_CollapsingHeader(\""
                        << structure.identifier << "\"))\n    {\n";
@@ -654,7 +654,7 @@ void CreateSource(std::vector<Structure>& structures, char** args,
         sourceFile << "    if (" << objIdent << " != NULL)\n";
         sourceFile << "    {\n";
         sourceFile << "        " << structure.identifier
-                   << "_DrawComponent(" << objIdent << ", state);\n";
+                   << "_DrawComponent(" << objIdent << ", state, ent);\n";
         sourceFile << "    }\n\n";
     }
 
@@ -823,7 +823,7 @@ void CreateHeader(std::vector<Structure>& structures, char** args,
         
         sourceFile << "void " << structure.identifier
                    << "_DrawComponent(" << structure.identifier
-                   << "* object, skECSState* state);\n\n";
+                   << "* object, skECSState* state, skEntityID ent);\n\n";
 
         // SERIALIZATION FUNCTIONS
 

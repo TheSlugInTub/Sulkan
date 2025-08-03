@@ -1732,7 +1732,6 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         skUniformBufferObject ubo = {0};
 
         glm_mat4_copy(line->transform, ubo.model);
-        glm_mat4_print(line->transform, stdout);
         
         glm_mat4_copy(renderer->viewTransform, ubo.view);
 

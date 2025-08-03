@@ -51,10 +51,9 @@ typedef struct skRigidbody3D
     float capsuleHeight;
 
     JPH_BodyID bodyID;
+    bool created;
 
-#ifdef SK_DEBUG
-    int lineIndex;
-#endif
+    u32 lineIndex;
 } skRigidbody3D;
 
 void             skPhysics3DTraceImpl(const char* message);

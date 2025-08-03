@@ -62,3 +62,5 @@ skRenderer_RecordCommandBuffers
 - [ ] Split skPhysics3dState_CreateBody function into multiple types of colliders
 - [ ] Fix micah formatting
 - [ ] Make physics_3d conversion between rigidbody and render association more performant
+- [ ] Clean everything up
+- [ ] Improve editor interface for components

@@ -14,15 +14,15 @@ skPhysics3DState skPhysics3DState_Create()
     state.broadPhaseLayers =
         skVector_Create(sizeof(JPH_BroadPhaseLayer), 2);
 
-    JPH_ObjectLayer nonMovingLayer = 0;
-    JPH_ObjectLayer movingLayer = 1;
-
     if (!JPH_Init())
     {
         printf("Jolt physics (Physics3D) failed to initialize\n");
     }
 
     JPH_SetTraceHandler(skPhysics3DTraceImpl);
+
+    JPH_ObjectLayer nonMovingLayer = 0;
+    JPH_ObjectLayer movingLayer = 1;
 
     state.jobSystem = JPH_JobSystemThreadPool_Create(NULL);
 
@@ -61,7 +61,7 @@ skPhysics3DState skPhysics3DState_Create()
             state.objectLayerPairFilterTable, 2);
 
     state.settings.maxBodies = 65536;
-    state.settings.numBodyMutexes = 0;
+    state.settings.numBodyMutexes = 1024;
     state.settings.maxBodyPairs = 65536;
     state.settings.maxContactConstraints = 65536;
     state.settings.broadPhaseLayerInterface =
@@ -104,6 +104,8 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                  skRigidbody3D*       rigid,
                                  skRenderAssociation* assoc)
 {
+    rigid->created = true;
+
     switch (rigid->colliderType)
     {
         case skCollider3DType_Box:
@@ -131,8 +133,6 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                          : JPH_MotionType_Dynamic,
                     (int)rigid->bodyType);
 
-            JPH_MassProperties msp = {};
-
             // Lock rotation
             if (rigid->fixedRotation)
             {
@@ -142,12 +142,15 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                   JPH_AllowedDOFs_TranslationZ);
             }
 
+            JPH_MassProperties msp;
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
             JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
+
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
                 settings, &msp);
             JPH_BodyCreationSettings_SetOverrideMassProperties(
                 settings,
-                JPH_OverrideMassProperties_CalculateInertia);
+                JPH_OverrideMassProperties_MassAndInertiaProvided);
 
             rigid->bodyID = JPH_BodyInterface_CreateAndAddBody(
                 state->bodyInterface, settings,
@@ -174,7 +177,7 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
 
             skRenderer_AddLineObject(ecsState->renderer, &line);
 
-            rigid->lineIndex = 
+            rigid->lineIndex =
                 ecsState->renderer->lineObjects->size - 1;
 #endif
             break;
@@ -195,9 +198,6 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                          : JPH_MotionType_Dynamic,
                     rigid->bodyType);
 
-            JPH_MassProperties msp = {};
-            JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
-
             // Lock rotation
             if (rigid->fixedRotation)
             {
@@ -207,11 +207,15 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                   JPH_AllowedDOFs_TranslationZ);
             }
 
+            JPH_MassProperties msp;
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
+            JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
+
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
                 settings, &msp);
             JPH_BodyCreationSettings_SetOverrideMassProperties(
                 settings,
-                JPH_OverrideMassProperties_CalculateInertia);
+                JPH_OverrideMassProperties_MassAndInertiaProvided);
 
             rigid->bodyID = JPH_BodyInterface_CreateAndAddBody(
                 state->bodyInterface, settings,
@@ -238,7 +242,7 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
 
             skRenderer_AddLineObject(ecsState->renderer, &line);
 
-            rigid->lineIndex = 
+            rigid->lineIndex =
                 ecsState->renderer->lineObjects->size - 1;
 #endif
             break;
@@ -272,10 +276,6 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                          : JPH_MotionType_Dynamic,
                     rigid->bodyType);
 
-            // Set mass properties
-            JPH_MassProperties msp = {};
-            JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
-
             // Lock rotation
             if (rigid->fixedRotation)
             {
@@ -285,11 +285,15 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                   JPH_AllowedDOFs_TranslationZ);
             }
 
+            JPH_MassProperties msp;
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
+            JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
+
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
                 settings, &msp);
             JPH_BodyCreationSettings_SetOverrideMassProperties(
                 settings,
-                JPH_OverrideMassProperties_CalculateInertia);
+                JPH_OverrideMassProperties_MassAndInertiaProvided);
 
             // Create and add body
             rigid->bodyID = JPH_BodyInterface_CreateAndAddBody(
@@ -318,7 +322,7 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
 
             skRenderer_AddLineObject(ecsState->renderer, &line);
 
-            rigid->lineIndex = 
+            rigid->lineIndex =
                 ecsState->renderer->lineObjects->size - 1;
 #endif
             break;
@@ -456,6 +460,11 @@ void skRigidbody3D_Sys(skECSState* state)
         skRenderAssociation* assoc =
             SK_ECS_GET(state->scene, _entity, skRenderAssociation);
 
+        if (!rigid->created)
+        {
+            continue;
+        }
+
         JPH_RVec3 pos;
         JPH_Quat  rot;
         JPH_BodyInterface_GetPositionAndRotation(
@@ -482,31 +491,35 @@ void skRigidbody3D_Sys(skECSState* state)
         glm_mat4_copy(trans, obj->transform);
 
 #ifdef SK_DEBUG
-        skLineObject* line = skVector_Get(state->renderer->lineObjects, 
-                rigid->lineIndex);
+        skLineObject* line = skVector_Get(
+            state->renderer->lineObjects, rigid->lineIndex);
+
+        mat4 lineTrans = GLM_MAT4_IDENTITY_INIT;
+        glm_translate(lineTrans, assoc->position);
+        glm_quat_rotate(lineTrans, assoc->rotation, lineTrans);
 
         switch (rigid->colliderType)
         {
             case skCollider3DType_Box:
             {
-                glm_scale(trans, rigid->boxHalfwidths);
-                glm_mat4_copy(trans, line->transform);
+                glm_scale(lineTrans, rigid->boxHalfwidths);
+                glm_mat4_copy(lineTrans, line->transform);
                 break;
             }
             case skCollider3DType_Sphere:
             {
-                glm_scale(trans, (vec3) {rigid->sphereRadius,
-                                         rigid->sphereRadius,
-                                         rigid->sphereRadius});
-                glm_mat4_copy(trans, line->transform);
+                glm_scale(lineTrans, (vec3) {rigid->sphereRadius,
+                                             rigid->sphereRadius,
+                                             rigid->sphereRadius});
+                glm_mat4_copy(lineTrans, line->transform);
                 break;
             }
             case skCollider3DType_Capsule:
             {
-                glm_scale(trans, (vec3) {rigid->capsuleRadius,
-                                         rigid->capsuleRadius,
-                                         rigid->capsuleHeight});
-                glm_mat4_copy(trans, line->transform);
+                glm_scale(lineTrans, (vec3) {rigid->capsuleRadius,
+                                             rigid->capsuleRadius,
+                                             rigid->capsuleHeight});
+                glm_mat4_copy(lineTrans, line->transform);
                 break;
             }
             case skCollider3DType_Mesh:

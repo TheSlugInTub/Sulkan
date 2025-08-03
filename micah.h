@@ -12,28 +12,28 @@
 // Procedurally generated header file for the Sulkan game engine
 // This contains drawer/serializer/deserializer function declarations for all registered components
 
-void skName_DrawComponent(skName* object, skECSState* state);
+void skName_DrawComponent(skName* object, skECSState* state, skEntityID ent);
 
 skJson skName_SaveComponent(skName* object);
 
 void skName_LoadComponent(skName* object, skJson j);
 
 
-void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* state);
+void skRenderAssociation_DrawComponent(skRenderAssociation* object, skECSState* state, skEntityID ent);
 
 skJson skRenderAssociation_SaveComponent(skRenderAssociation* object);
 
 void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j);
 
 
-void skLightAssociation_DrawComponent(skLightAssociation* object, skECSState* state);
+void skLightAssociation_DrawComponent(skLightAssociation* object, skECSState* state, skEntityID ent);
 
 skJson skLightAssociation_SaveComponent(skLightAssociation* object);
 
 void skLightAssociation_LoadComponent(skLightAssociation* object, skJson j);
 
 
-void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state);
+void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state, skEntityID ent);
 
 skJson skRigidbody3D_SaveComponent(skRigidbody3D* object);
 
