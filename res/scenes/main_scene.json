@@ -182,7 +182,7 @@
             "normalTexturePath": "",
             "objectIndex": 3,
             "position": [
-                -1.100000023841858,
+                -0.699999988079071,
                 0.0,
                 6.900000095367432
             ],
@@ -200,25 +200,6 @@
             ],
             "texturePath": "res/textures/image.png",
             "type": 0
-        },
-        {
-            "angularDamping": 0.0,
-            "bodyType": 1,
-            "boxHalfwidths": [
-                0.6000000238418579,
-                0.20000000298023224,
-                1.0
-            ],
-            "capsuleHeight": 0.0,
-            "capsuleRadius": 0.0,
-            "colliderType": 0,
-            "componentType": "skRigidbody3D",
-            "fixedRotation": false,
-            "friction": 0.0,
-            "linearDamping": 0.0,
-            "mass": 5.0,
-            "restitution": 0.0,
-            "sphereRadius": 0.0
         }
     ]
 ]

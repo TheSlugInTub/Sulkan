@@ -64,7 +64,11 @@ void             skPhysics3DState_ClearWorld(skPhysics3DState* state);
 void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                  skECSState*          ecsState,
                                  skRigidbody3D*       rigid,
-                                 skRenderAssociation* assoc);
+                                 skRenderAssociation* assoc,
+                                 skModel* model);
+void skPhysics3DState_DestroyBody(skPhysics3DState* state,
+                                  skRenderer* renderer,
+                                  skRigidbody3D*    body);
 
 void skRigidbody3D_Sys(skECSState* state);
 void skRigidbody3D_StartSys(skECSState* state);

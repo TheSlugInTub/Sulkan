@@ -102,7 +102,8 @@ void skPhysics3DState_ClearWorld(skPhysics3DState* state)
 void skPhysics3DState_CreateBody(skPhysics3DState*    state,
                                  skECSState*          ecsState,
                                  skRigidbody3D*       rigid,
-                                 skRenderAssociation* assoc)
+                                 skRenderAssociation* assoc,
+                                 skModel* model)
 {
     rigid->created = true;
 
@@ -143,7 +144,8 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             }
 
             JPH_MassProperties msp;
-            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape,
+                                        &msp);
             JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
 
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
@@ -208,7 +210,8 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             }
 
             JPH_MassProperties msp;
-            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape,
+                                        &msp);
             JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
 
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
@@ -286,7 +289,8 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
             }
 
             JPH_MassProperties msp;
-            JPH_Shape_GetMassProperties((const JPH_Shape*)shape, &msp);
+            JPH_Shape_GetMassProperties((const JPH_Shape*)shape,
+                                        &msp);
             JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
 
             JPH_BodyCreationSettings_SetMassPropertiesOverride(
@@ -329,125 +333,134 @@ void skPhysics3DState_CreateBody(skPhysics3DState*    state,
         }
         case skCollider3DType_Mesh:
         {
-            // TODO
-            // JPH_Vec3 position = {assoc->position[0],
-            //                      assoc->position[1],
-            //                      assoc->position[2]};
+            JPH_Vec3 position = {assoc->position[0],
+                                 assoc->position[1],
+                                 assoc->position[2]};
 
-            // // Convert rotation to JPH_Quat
-            // vec4 glmQuat;
-            // glm_euler_xyz_quat(assoc->rotation, glmQuat);
-            // JPH_Quat quat = (JPH_Quat) {glmQuat[0], glmQuat[1],
-            //                             glmQuat[2], glmQuat[3]};
+            // Convert rotation to JPH_Quat
+            vec4 glmQuat;
+            glm_euler_xyz_quat(assoc->rotation, glmQuat);
+            JPH_Quat quat = (JPH_Quat) {glmQuat[0], glmQuat[1], glmQuat[2], glmQuat[3]};
 
-            // // Collect all triangles from all meshes
-            // size_t totalTriangles = 0;
-            // for (size_t meshIdx = 0; meshIdx < model->meshes->size;
-            //      meshIdx++)
-            // {
-            //     skMesh* mesh =
-            //         (skMesh*)smVector_Get(assoc->->meshes,
-            //         meshIdx);
-            //     totalTriangles += mesh->indices->size / 3;
-            // }
+            // Collect all triangles from all meshes
+            size_t totalTriangles = 0;
+            for (size_t meshIdx = 0; meshIdx < model->meshes->size; meshIdx++) 
+            {
+                skMesh* mesh = (skMesh*)skVector_Get(model->meshes, meshIdx);
+                totalTriangles += mesh->indices->size / 3;
+            }
 
-            // if (totalTriangles == 0)
-            //     break;
+            if (totalTriangles == 0) 
+                break;
 
-            // JPH_Triangle* triangles = (JPH_Triangle*)malloc(
-            //     sizeof(JPH_Triangle) * totalTriangles);
-            // if (!triangles)
-            //     break;
+            JPH_Triangle* triangles = (JPH_Triangle*)malloc(
+                    sizeof(JPH_Triangle) * totalTriangles);
+            if (!triangles) break;
 
-            // size_t triangleIndex = 0;
-            // for (size_t meshIdx = 0; meshIdx < model->meshes->size;
-            //      meshIdx++)
-            // {
-            //     smMesh* mesh =
-            //         (smMesh*)smVector_Get(model->meshes, meshIdx);
-            //     smVector* vertices = mesh->vertices;
-            //     smVector* indices = mesh->indices;
+            size_t triangleIndex = 0;
+            for (size_t meshIdx = 0; meshIdx < model->meshes->size; meshIdx++) {
+                skMesh* mesh = (skMesh*)skVector_Get(model->meshes, meshIdx);
+                skVector* vertices = mesh->vertices;
+                skVector* indices = mesh->indices;
 
-            //     size_t numIndices = indices->size;
-            //     size_t numTriangles = numIndices / 3;
+                size_t numIndices = indices->size;
+                size_t numTriangles = numIndices / 3;
 
-            //     for (size_t i = 0; i < numTriangles; i++)
-            //     {
-            //         unsigned int idx0 =
-            //             *(unsigned int*)smVector_Get(indices, i *
-            //             3);
-            //         unsigned int idx1 = *(unsigned
-            //         int*)smVector_Get(
-            //             indices, i * 3 + 1);
-            //         unsigned int idx2 = *(unsigned
-            //         int*)smVector_Get(
-            //             indices, i * 3 + 2);
+                for (size_t i = 0; i < numTriangles; i++) {
+                    unsigned int idx0 = *(unsigned int*)skVector_Get(indices, i * 3);
+                    unsigned int idx1 = *(unsigned int*)skVector_Get(indices, i * 3 + 1);
+                    unsigned int idx2 = *(unsigned int*)skVector_Get(indices, i * 3 + 2);
 
-            //         smVertex* v0 =
-            //             (smVertex*)smVector_Get(vertices, idx0);
-            //         smVertex* v1 =
-            //             (smVertex*)smVector_Get(vertices, idx1);
-            //         smVertex* v2 =
-            //             (smVertex*)smVector_Get(vertices, idx2);
+                    skVertex* v0 = (skVertex*)skVector_Get(vertices, idx0);
+                    skVertex* v1 = (skVertex*)skVector_Get(vertices, idx1);
+                    skVertex* v2 = (skVertex*)skVector_Get(vertices, idx2);
 
-            //         triangles[triangleIndex].v1.x =
-            //         v0->position[0]; triangles[triangleIndex].v1.y
-            //         = v0->position[1];
-            //         triangles[triangleIndex].v1.z =
-            //         v0->position[2]; triangles[triangleIndex].v2.x
-            //         = v1->position[0];
-            //         triangles[triangleIndex].v2.y =
-            //         v1->position[1]; triangles[triangleIndex].v2.z
-            //         = v1->position[2];
-            //         triangles[triangleIndex].v3.x =
-            //         v2->position[0]; triangles[triangleIndex].v3.y
-            //         = v2->position[1];
-            //         triangles[triangleIndex].v3.z =
-            //         v2->position[2];
-            //         triangles[triangleIndex].materialIndex = 0;
-            //         triangleIndex++;
-            //     }
-            // }
+                    triangles[triangleIndex].v1.x = v0->position[0];
+                    triangles[triangleIndex].v1.y = v0->position[1];
+                    triangles[triangleIndex].v1.z = v0->position[2];
+                    triangles[triangleIndex].v2.x = v1->position[0];
+                    triangles[triangleIndex].v2.y = v1->position[1];
+                    triangles[triangleIndex].v2.z = v1->position[2];
+                    triangles[triangleIndex].v3.x = v2->position[0];
+                    triangles[triangleIndex].v3.y = v2->position[1];
+                    triangles[triangleIndex].v3.z = v2->position[2];
+                    triangles[triangleIndex].materialIndex = 0;
+                    triangleIndex++;
+                }
+            }
 
-            // // Create mesh shape
-            // JPH_MeshShapeSettings* meshSettings =
-            //     JPH_MeshShapeSettings_Create(
-            //         triangles, (uint32_t)totalTriangles);
+            // Create mesh shape
+            JPH_MeshShapeSettings* meshSettings = 
+                JPH_MeshShapeSettings_Create(triangles, (uint32_t)totalTriangles);
+            
+            JPH_MeshShapeSettings_Sanitize(meshSettings);
+            JPH_MeshShape* shape = JPH_MeshShapeSettings_CreateShape(meshSettings);
+            free(triangles);
 
-            // JPH_MeshShapeSettings_Sanitize(meshSettings);
-            // JPH_MeshShape* shape =
-            //     JPH_MeshShapeSettings_CreateShape(meshSettings);
-            // free(triangles);
+            if (!shape) break;
 
-            // if (!shape)
-            //     break;
+            // Create body creation settings
+            JPH_BodyCreationSettings* settings =
+                JPH_BodyCreationSettings_Create3(
+                    (const JPH_Shape*)shape,
+                    &position,
+                    &quat,
+                    JPH_MotionType_Static,
+                    rigid->bodyType
+                );
 
-            // // Create body creation settings
-            // JPH_BodyCreationSettings* settings =
-            //     JPH_BodyCreationSettings_Create3(
-            //         (const JPH_Shape*)shape, &position, &quat,
-            //         JPH_MotionType_Static, rigid->bodyType);
+            // Set mass properties (for static bodies, mass is ignored)
+            JPH_MassProperties msp = {};
+            JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
+            JPH_BodyCreationSettings_SetMassPropertiesOverride(settings, &msp);
+            JPH_BodyCreationSettings_SetOverrideMassProperties(
+                settings,
+                JPH_OverrideMassProperties_CalculateInertia
+            );
 
-            // // Set mass properties (for static bodies, mass is
-            // // ignored)
-            // JPH_MassProperties msp = {};
-            // JPH_MassProperties_ScaleToMass(&msp, rigid->mass);
-            // JPH_BodyCreationSettings_SetMassPropertiesOverride(
-            //     settings, &msp);
-            // JPH_BodyCreationSettings_SetOverrideMassProperties(
-            //     settings,
-            //     JPH_OverrideMassProperties_CalculateInertia);
+            // Create and add body
+            rigid->bodyID = JPH_BodyInterface_CreateAndAddBody(
+                state->bodyInterface,
+                settings,
+                JPH_Activation_DontActivate
+            );
 
-            // // Create and add body
-            // rigid->bodyID = JPH_BodyInterface_CreateAndAddBody(
-            //     skCollider3DType_state.bodyInterface, settings,
-            //     JPH_Activation_DontActivate);
+            // Clean up
+            JPH_BodyCreationSettings_Destroy(settings);
 
-            // // Clean up
-            // JPH_BodyCreationSettings_Destroy(settings);
+#ifdef SK_DEBUG
+            vec3 cubePoints[8] = {
+                {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+                {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
+                {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+                {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
+            u32 cubeIndices[24] = {
+                0, 1, 1, 2, 2, 3, 3, 0, // bottom
+                4, 5, 5, 6, 6, 7, 7, 4, // top
+                0, 4, 1, 5, 2, 6, 3, 7  // sides
+            };
+
+            skLineObject line = skLineObject_Create(
+                ecsState->renderer, cubePoints, cubeIndices, 8, 24,
+                (vec3) {1.0f, 0.0f, 0.0f}, 3.0f);
+
+            skRenderer_AddLineObject(ecsState->renderer, &line);
+
+            rigid->lineIndex =
+                ecsState->renderer->lineObjects->size - 1;
+#endif
             break;
         }
     }
+}
+
+void skPhysics3DState_DestroyBody(skPhysics3DState* state,
+                                  skRenderer*       renderer,
+                                  skRigidbody3D*    body)
+{
+    JPH_BodyInterface_RemoveAndDestroyBody(state->bodyInterfaceNoLock,
+                                           body->bodyID);
+    skVector_Remove(renderer->lineObjects, body->lineIndex);
 }
 
 void skRigidbody3D_Sys(skECSState* state)
@@ -524,7 +537,8 @@ void skRigidbody3D_Sys(skECSState* state)
             }
             case skCollider3DType_Mesh:
             {
-                // TODO
+                glm_scale(lineTrans, assoc->scale);
+                glm_mat4_copy(lineTrans, line->transform);
                 break;
             }
         }
@@ -543,8 +557,11 @@ void skRigidbody3D_StartSys(skECSState* state)
         skRenderAssociation* assoc =
             SK_ECS_GET(state->scene, _entity, skRenderAssociation);
 
+        skModel model = skModel_Create();
+        skModel_Load(&model, assoc->modelPath);
+
         skPhysics3DState_CreateBody(state->physics3dState, state,
-                                    rigid, assoc);
+                                    rigid, assoc, &model);
     }
     SK_ECS_ITER_END();
 }

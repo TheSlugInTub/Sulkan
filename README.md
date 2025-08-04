@@ -64,3 +64,9 @@ skRenderer_RecordCommandBuffers
 - [ ] Make physics_3d conversion between rigidbody and render association more performant
 - [ ] Clean everything up
 - [ ] Improve editor interface for components
+- [ ] Fix meshes in rigidbody creation
+
+# Quirks
+
+If you have a rigidbody with a rotation with the component w set to zero, it will crash
+the program if it collides with another rigidbody.

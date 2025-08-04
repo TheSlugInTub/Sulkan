@@ -2,9 +2,11 @@
 
 // micah.c
 // Procedurally generated source file for the Sulkan game engine
-// This contains drawer/serializer/deserializer functions for all registered components
+// This contains drawer/serializer/deserializer functions for all
+// registered components
 
-void skName_DrawComponent(skName* object, skECSState* state, skEntityID ent)
+void skName_DrawComponent(skName* object, skECSState* state,
+                          skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skName"))
     {
@@ -28,7 +30,7 @@ void skName_LoadComponent(skName* object, skJson j)
 // IGNORE
 void skRenderAssociation_DrawComponent(skRenderAssociation* object,
                                        skECSState*          state,
-                                       skEntityID ent)
+                                       skEntityID           ent)
 {
     if (skImGui_CollapsingHeader("skRenderAssociation"))
     {
@@ -70,12 +72,13 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object,
                 skModel model = skModel_Create();
                 skModel_Load(&model, object->modelPath);
 
-                skRenderObject* obj =
-                    (skRenderObject*)skVector_Get(state->renderer->renderObjects,
-                                 object->objectIndex);
+                skRenderObject* obj = (skRenderObject*)skVector_Get(
+                    state->renderer->renderObjects,
+                    object->objectIndex);
                 *obj = skRenderObject_CreateFromModel(
                     state->renderer, &model, 0, object->texturePath,
-                    object->normalTexturePath, object->roughnessTexturePath);
+                    object->normalTexturePath,
+                    object->roughnessTexturePath);
 
                 VkDeviceSize bufferSize =
                     sizeof(skUniformBufferObject);
@@ -119,12 +122,13 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object,
 
             if (skImGui_Button("Update Sprite"))
             {
-                skRenderObject* obj =
-                    (skRenderObject*)skVector_Get(state->renderer->renderObjects,
-                                 object->objectIndex);
+                skRenderObject* obj = (skRenderObject*)skVector_Get(
+                    state->renderer->renderObjects,
+                    object->objectIndex);
                 *obj = skRenderObject_CreateFromSprite(
                     state->renderer, object->texturePath,
-                    object->normalTexturePath, object->roughnessTexturePath);
+                    object->normalTexturePath,
+                    object->roughnessTexturePath);
 
                 VkDeviceSize bufferSize =
                     sizeof(skUniformBufferObject);
@@ -177,22 +181,27 @@ skJson skRenderAssociation_SaveComponent(skRenderAssociation* object)
     skJson_SaveInt(j, "type", object->type);
     skJson_SaveString(j, "modelPath", object->modelPath);
     skJson_SaveString(j, "texturePath", object->texturePath);
-    skJson_SaveString(j, "normalTexturePath", object->normalTexturePath);
-    skJson_SaveString(j, "roughnessTexturePath", object->roughnessTexturePath);
+    skJson_SaveString(j, "normalTexturePath",
+                      object->normalTexturePath);
+    skJson_SaveString(j, "roughnessTexturePath",
+                      object->roughnessTexturePath);
     skJson_SaveFloat3(j, "position", object->position);
     skJson_SaveFloat4(j, "rotation", object->rotation);
     skJson_SaveFloat3(j, "scale", object->scale);
     return j;
 }
 
-void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
+void skRenderAssociation_LoadComponent(skRenderAssociation* object,
+                                       skJson               j)
 {
     skJson_LoadInt(j, "objectIndex", &object->objectIndex);
     skJson_LoadInt(j, "type", &object->type);
     skJson_LoadString(j, "modelPath", object->modelPath);
     skJson_LoadString(j, "texturePath", object->texturePath);
-    skJson_LoadString(j, "normalTexturePath", object->normalTexturePath);
-    skJson_LoadString(j, "roughnessTexturePath", object->roughnessTexturePath);
+    skJson_LoadString(j, "normalTexturePath",
+                      object->normalTexturePath);
+    skJson_LoadString(j, "roughnessTexturePath",
+                      object->roughnessTexturePath);
     skJson_LoadFloat3(j, "position", object->position);
     skJson_LoadFloat4(j, "rotation", object->rotation);
     skJson_LoadFloat3(j, "scale", object->scale);
@@ -201,7 +210,7 @@ void skRenderAssociation_LoadComponent(skRenderAssociation* object, skJson j)
 // IGNORE
 void skLightAssociation_DrawComponent(skLightAssociation* object,
                                       skECSState*         state,
-                                      skEntityID ent)
+                                      skEntityID          ent)
 {
     if (skImGui_CollapsingHeader("skLightAssociation"))
     {
@@ -223,8 +232,8 @@ void skLightAssociation_DrawComponent(skLightAssociation* object,
             skImGui_DragFloat("radius", &object->radius, 0.1f) ||
             skImGui_DragFloat("intensity", &object->intensity, 0.1f))
         {
-            skLight* light = (skLight*)skVector_Get(state->renderer->lights,
-                                          object->lightIndex);
+            skLight* light = (skLight*)skVector_Get(
+                state->renderer->lights, object->lightIndex);
             light->intensity = object->intensity;
             light->radius = object->radius;
             glm_vec3_copy(object->position, light->position);
@@ -245,7 +254,8 @@ skJson skLightAssociation_SaveComponent(skLightAssociation* object)
     return j;
 }
 
-void skLightAssociation_LoadComponent(skLightAssociation* object, skJson j)
+void skLightAssociation_LoadComponent(skLightAssociation* object,
+                                      skJson              j)
 {
     skJson_LoadInt(j, "lightIndex", &object->lightIndex);
     skJson_LoadFloat3(j, "position", object->position);
@@ -255,7 +265,8 @@ void skLightAssociation_LoadComponent(skLightAssociation* object, skJson j)
 }
 
 // IGNORE
-void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state, skEntityID ent)
+void skRigidbody3D_DrawComponent(skRigidbody3D* object,
+                                 skECSState* state, skEntityID ent)
 {
     if (skImGui_CollapsingHeader("skRigidbody3D"))
     {
@@ -263,20 +274,47 @@ void skRigidbody3D_DrawComponent(skRigidbody3D* object, skECSState* state, skEnt
         skImGui_InputInt("colliderType", &object->colliderType);
         skImGui_DragFloat("mass", &object->mass, 0.1f);
         skImGui_DragFloat("friction", &object->friction, 0.1f);
-        skImGui_DragFloat("linearDamping", &object->linearDamping, 0.1f);
-        skImGui_DragFloat("angularDamping", &object->angularDamping, 0.1f);
+        skImGui_DragFloat("linearDamping", &object->linearDamping,
+                          0.1f);
+        skImGui_DragFloat("angularDamping", &object->angularDamping,
+                          0.1f);
         skImGui_DragFloat("restitution", &object->restitution, 0.1f);
-        skImGui_DragFloat3("boxHalfwidths", object->boxHalfwidths, 0.1f);
-        skImGui_DragFloat("sphereRadius", &object->sphereRadius, 0.1f);
-        skImGui_DragFloat("capsuleRadius", &object->capsuleRadius, 0.1f);
-        skImGui_DragFloat("capsuleHeight", &object->capsuleHeight, 0.1f);
-        
-        if (skImGui_Button("Create Jolt body for this skRigidbody3D"))
-        {   
-            skRenderAssociation* assoc = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+        skImGui_DragFloat3("boxHalfwidths", object->boxHalfwidths,
+                           0.1f);
+        skImGui_DragFloat("sphereRadius", &object->sphereRadius,
+                          0.1f);
+        skImGui_DragFloat("capsuleRadius", &object->capsuleRadius,
+                          0.1f);
+        skImGui_DragFloat("capsuleHeight", &object->capsuleHeight,
+                          0.1f);
+        skImGui_Checkbox("created", &object->created);
+
+        if (skImGui_Button(
+                "Create/Update Jolt body for this skRigidbody3D"))
+        {
+            skRenderAssociation* assoc =
+                SK_ECS_GET(state->scene, ent, skRenderAssociation);
+
+            skModel model = skModel_Create();
+            skModel_Load(&model, assoc->modelPath);
+
             skPhysics3DState_CreateBody(state->physics3dState, state,
-                                        object, assoc);
+                                        object, assoc, &model);
             object->created = true;
+        }
+
+        if (skImGui_Button("Update Jolt body for this skRigidbody3D"))
+        {
+            skRenderAssociation* assoc =
+                SK_ECS_GET(state->scene, ent, skRenderAssociation);
+            
+            skModel model = skModel_Create();
+            skModel_Load(&model, assoc->modelPath);
+            
+            skPhysics3DState_DestroyBody(state->physics3dState,
+                                         state->renderer, object);
+            skPhysics3DState_CreateBody(state->physics3dState, state,
+                                        object, assoc, &model);
         }
     }
 }
@@ -325,27 +363,31 @@ void Micah_DrawAllComponents(skECSState* state, skEntityID ent)
         skName_DrawComponent(skNameObj, state, ent);
     }
 
-    skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+    skRenderAssociation* skRenderAssociationObj =
+        SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
     if (skRenderAssociationObj != NULL)
     {
-        skRenderAssociation_DrawComponent(skRenderAssociationObj, state, ent);
+        skRenderAssociation_DrawComponent(skRenderAssociationObj,
+                                          state, ent);
     }
 
-    skLightAssociation* skLightAssociationObj = SK_ECS_GET(state->scene, ent, skLightAssociation);
+    skLightAssociation* skLightAssociationObj =
+        SK_ECS_GET(state->scene, ent, skLightAssociation);
 
     if (skLightAssociationObj != NULL)
     {
-        skLightAssociation_DrawComponent(skLightAssociationObj, state, ent);
+        skLightAssociation_DrawComponent(skLightAssociationObj, state,
+                                         ent);
     }
 
-    skRigidbody3D* skRigidbody3DObj = SK_ECS_GET(state->scene, ent, skRigidbody3D);
+    skRigidbody3D* skRigidbody3DObj =
+        SK_ECS_GET(state->scene, ent, skRigidbody3D);
 
     if (skRigidbody3DObj != NULL)
     {
         skRigidbody3D_DrawComponent(skRigidbody3DObj, state, ent);
     }
-
 }
 
 skJson Micah_SaveAllComponents(skECSState* state)
@@ -355,7 +397,7 @@ skJson Micah_SaveAllComponents(skECSState* state)
     for (int i = 0; i < skECS_EntityCount(state->scene); i++)
     {
         skEntityID ent = skECS_GetEntityAtIndex(state->scene, i);
-        skJson entJson = skJson_Create();
+        skJson     entJson = skJson_Create();
 
         if (!skECS_IsEntityValid(ent))
         {
@@ -372,32 +414,41 @@ skJson Micah_SaveAllComponents(skECSState* state)
             skJson_Destroy(compJson);
         }
 
-        skRenderAssociation* skRenderAssociationObj = SK_ECS_GET(state->scene, ent, skRenderAssociation);
+        skRenderAssociation* skRenderAssociationObj =
+            SK_ECS_GET(state->scene, ent, skRenderAssociation);
 
         if (skRenderAssociationObj != NULL)
         {
-            skJson compJson = skRenderAssociation_SaveComponent(skRenderAssociationObj);
-            skJson_SaveString(compJson, "componentType", "skRenderAssociation");
+            skJson compJson = skRenderAssociation_SaveComponent(
+                skRenderAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skRenderAssociation");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
 
-        skLightAssociation* skLightAssociationObj = SK_ECS_GET(state->scene, ent, skLightAssociation);
+        skLightAssociation* skLightAssociationObj =
+            SK_ECS_GET(state->scene, ent, skLightAssociation);
 
         if (skLightAssociationObj != NULL)
         {
-            skJson compJson = skLightAssociation_SaveComponent(skLightAssociationObj);
-            skJson_SaveString(compJson, "componentType", "skLightAssociation");
+            skJson compJson = skLightAssociation_SaveComponent(
+                skLightAssociationObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skLightAssociation");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
 
-        skRigidbody3D* skRigidbody3DObj = SK_ECS_GET(state->scene, ent, skRigidbody3D);
+        skRigidbody3D* skRigidbody3DObj =
+            SK_ECS_GET(state->scene, ent, skRigidbody3D);
 
         if (skRigidbody3DObj != NULL)
         {
-            skJson compJson = skRigidbody3D_SaveComponent(skRigidbody3DObj);
-            skJson_SaveString(compJson, "componentType", "skRigidbody3D");
+            skJson compJson =
+                skRigidbody3D_SaveComponent(skRigidbody3DObj);
+            skJson_SaveString(compJson, "componentType",
+                              "skRigidbody3D");
             skJson_PushBack(entJson, compJson);
             skJson_Destroy(compJson);
         }
@@ -409,45 +460,53 @@ skJson Micah_SaveAllComponents(skECSState* state)
     return j;
 }
 
-
 void Micah_LoadAllComponents(skECSState* state, skJson j)
 {
     int entityCount = skJson_GetArraySize(j);
 
     for (int i = 0; i < entityCount; i++)
     {
-        skJson entJson = skJson_GetArrayElement(j, i);
+        skJson     entJson = skJson_GetArrayElement(j, i);
         skEntityID ent = skECS_AddEntity(state->scene);
 
         int componentCount = skJson_GetArraySize(entJson);
 
-        for (int compIndex = 0; compIndex < componentCount; compIndex++)
+        for (int compIndex = 0; compIndex < componentCount;
+             compIndex++)
         {
-            skJson compJson = skJson_GetArrayElement(entJson, compIndex);
+            skJson compJson =
+                skJson_GetArrayElement(entJson, compIndex);
 
             char componentType[256];
-            skJson_LoadString(compJson, "componentType", componentType);
+            skJson_LoadString(compJson, "componentType",
+                              componentType);
 
             // Check component type and assign/load accordingly
-            if (false) {} // Dummy condition for cleaner generated code
+            if (false) {
+            } // Dummy condition for cleaner generated code
             else if (strcmp(componentType, "skName") == 0)
             {
-                skName* comp = SK_ECS_ASSIGN(state->scene, ent, skName);
+                skName* comp =
+                    SK_ECS_ASSIGN(state->scene, ent, skName);
                 skName_LoadComponent(comp, compJson);
             }
-            else if (strcmp(componentType, "skRenderAssociation") == 0)
+            else if (strcmp(componentType, "skRenderAssociation") ==
+                     0)
             {
-                skRenderAssociation* comp = SK_ECS_ASSIGN(state->scene, ent, skRenderAssociation);
+                skRenderAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skRenderAssociation);
                 skRenderAssociation_LoadComponent(comp, compJson);
             }
             else if (strcmp(componentType, "skLightAssociation") == 0)
             {
-                skLightAssociation* comp = SK_ECS_ASSIGN(state->scene, ent, skLightAssociation);
+                skLightAssociation* comp = SK_ECS_ASSIGN(
+                    state->scene, ent, skLightAssociation);
                 skLightAssociation_LoadComponent(comp, compJson);
             }
             else if (strcmp(componentType, "skRigidbody3D") == 0)
             {
-                skRigidbody3D* comp = SK_ECS_ASSIGN(state->scene, ent, skRigidbody3D);
+                skRigidbody3D* comp =
+                    SK_ECS_ASSIGN(state->scene, ent, skRigidbody3D);
                 skRigidbody3D_LoadComponent(comp, compJson);
             }
         }
