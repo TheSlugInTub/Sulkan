@@ -6,6 +6,19 @@
 #include "../micah.h"
 #include <sulkan/json_api.h>
 
+skEditor skEditor_Create(skECSState* state, const char* scenePath,
+                         const char* documentationPath)
+{
+    skEditor editor = {0};
+
+    editor.ecsState = state;
+    u32 len;
+    strcpy(editor.sceneName, scenePath);
+    editor.documentationText = skReadFile(documentationPath, &len);
+
+    return editor;
+}
+
 void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
                         const char* sceneName)
 {
@@ -14,15 +27,26 @@ void skEditor_SaveScene(skECSState* state, skSceneHandle scene,
     skJson_Destroy(json);
 }
 
-void skEditor_LoadScene(skECSState* state, skSceneHandle scene, const char* filepath)
+void skEditor_LoadScene(skECSState* state, skSceneHandle scene,
+                        const char* filepath)
 {
+    if (state->physics3dState != NULL)
+    {
+        skPhysics3DState_ClearWorld(state->physics3dState);
+    }
+    
+    skVector_Clear(state->renderer->renderObjects);
+    skVector_Clear(state->renderer->lineObjects);
+    skVector_Clear(state->renderer->lights);
+
     skECS_ClearScene(scene);
 
     skJson j = skJson_LoadFromFile(filepath);
 
     if (j == NULL)
     {
-        printf("SK ERROR: in skEditor_LoadScene, filepath is invalid.");
+        printf(
+            "SK ERROR: in skEditor_LoadScene, filepath is invalid.");
         return;
     }
 
@@ -49,7 +73,7 @@ void skEditor_DrawHierarchy(skEditor* editor)
         skImGui_PushID((int)i);
 
         skName* name = SK_ECS_GET(scene, ent, skName);
-        
+
         bool selected = editor->selectedEntityIndex == (int)i;
         assert(name != NULL);
         if (skImGui_Selectable(name->name, selected))
@@ -151,13 +175,13 @@ void skEditor_DrawTray(skEditor* editor)
     if (skImGui_Button("Save"))
     {
         skEditor_SaveScene(editor->ecsState, editor->ecsState->scene,
-                editor->sceneName);
+                           editor->sceneName);
     }
-    
+
     if (skImGui_Button("Load"))
     {
-        skEditor_LoadScene(editor->ecsState, editor->ecsState->scene, 
-                editor->sceneName);
+        skEditor_LoadScene(editor->ecsState, editor->ecsState->scene,
+                           editor->sceneName);
     }
 
     if (!editor->playing)
@@ -174,6 +198,12 @@ void skEditor_DrawTray(skEditor* editor)
             editor->playing = false;
         }
     }
+
+    skImGui_End();
+
+    skImGui_Begin("Documentation");
+
+    skImGui_TextLong(editor->documentationText);
 
     skImGui_End();
 }

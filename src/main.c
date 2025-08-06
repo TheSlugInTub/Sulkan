@@ -31,8 +31,8 @@ int main(int argc, char** argv)
                            .window = &window,
                            .physics3dState = &physicsState};
 
-    skEditor editor = {.ecsState = &ecsState};
-    strcpy(editor.sceneName, "res/scenes/main_scene.json");
+    skEditor editor = skEditor_Create(
+        &ecsState, "res/scenes/main_scene.json", "documentation.md");
 
     skECS_AddSystem(skCamera_Sys, false);
     skECS_AddSystem(skRenderAssociation_StartSys, true);

@@ -158,17 +158,22 @@ void skRenderAssociation_DrawComponent(skRenderAssociation* object,
         skRenderObject* obj = (skRenderObject*)skVector_Get(
             state->renderer->renderObjects, object->objectIndex);
 
-        if ((skImGui_DragFloat3("position", object->position, 0.1f) ||
-             skImGui_DragFloat4("rotation", object->rotation, 0.1f) ||
-             skImGui_DragFloat3("scale", object->scale, 0.1f)) &&
-            obj != NULL)
+        if (obj != NULL)
         {
-            mat4 trans = GLM_MAT4_IDENTITY_INIT;
-            glm_translate(trans, object->position);
-            glm_quat_rotate(trans, object->rotation, trans);
-            glm_scale(trans, object->scale);
+            if ((skImGui_DragFloat3("position", object->position,
+                                    0.1f) ||
+                 skImGui_DragFloat4("rotation", object->rotation,
+                                    0.1f) ||
+                 skImGui_DragFloat3("scale", object->scale, 0.1f)))
+            {
+                mat4 trans = GLM_MAT4_IDENTITY_INIT;
+                glm_translate(trans, object->position);
+                glm_quat_normalize(object->rotation);
+                glm_quat_rotate(trans, object->rotation, trans);
+                glm_scale(trans, object->scale);
 
-            glm_mat4_copy(trans, obj->transform);
+                glm_mat4_copy(trans, obj->transform);
+            }
         }
     }
 }
@@ -307,10 +312,10 @@ void skRigidbody3D_DrawComponent(skRigidbody3D* object,
         {
             skRenderAssociation* assoc =
                 SK_ECS_GET(state->scene, ent, skRenderAssociation);
-            
+
             skModel model = skModel_Create();
             skModel_Load(&model, assoc->modelPath);
-            
+
             skPhysics3DState_DestroyBody(state->physics3dState,
                                          state->renderer, object);
             skPhysics3DState_CreateBody(state->physics3dState, state,

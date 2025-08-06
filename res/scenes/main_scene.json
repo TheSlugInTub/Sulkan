@@ -201,5 +201,142 @@
             "texturePath": "res/textures/image.png",
             "type": 0
         }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "Ent"
+        },
+        {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/room.fbx",
+            "normalTexturePath": "",
+            "objectIndex": 0,
+            "position": [
+                -1.100000023841858,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "roughnessTexturePath": "",
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "texturePath": "res/textures/room.bmp",
+            "type": 0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "Ent"
+        },
+        {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/room.fbx",
+            "normalTexturePath": "res/textures/default_normal.bmp",
+            "objectIndex": 1,
+            "position": [
+                0.6990000009536743,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "roughnessTexturePath": "",
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "texturePath": "res/textures/room.bmp",
+            "type": 0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "LightAssoc"
+        },
+        {
+            "color": [
+                0.0,
+                1.100000023841858,
+                1.0
+            ],
+            "componentType": "skLightAssociation",
+            "intensity": 0.5,
+            "lightIndex": 0,
+            "position": [
+                1.5429999828338623,
+                0.10000000149011612,
+                0.492000013589859
+            ],
+            "radius": 1.0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "mapp"
+        },
+        {
+            "componentType": "skRenderAssociation",
+            "modelPath": "res/models/sphere.fbx",
+            "normalTexturePath": "res/textures/bricks_normal.png",
+            "objectIndex": 2,
+            "position": [
+                1.0260000228881836,
+                0.0,
+                0.47600001096725464
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "roughnessTexturePath": "res/textures/bricks_roughness.png",
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ],
+            "texturePath": "res/textures/bricks.png",
+            "type": 0
+        }
+    ],
+    [
+        {
+            "componentType": "skName",
+            "name": "Entity"
+        },
+        {
+            "color": [
+                1.0,
+                0.0,
+                1.0
+            ],
+            "componentType": "skLightAssociation",
+            "intensity": 2.5999999046325684,
+            "lightIndex": 1,
+            "position": [
+                -0.4000000059604645,
+                0.0,
+                0.5
+            ],
+            "radius": 1.0
+        }
     ]
 ]

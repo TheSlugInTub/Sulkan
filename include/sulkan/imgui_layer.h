@@ -59,7 +59,7 @@ bool skImGui_ColorEdit4(const char* name, float* val);
 bool skImGui_IsWindowHovered();
 bool skImGui_CollapsingHeader(const char* name);
 bool skImGui_ColorPicker(const char* name, vec4 color);
-void skImGui_Textf(const char* val, ...);
+void skImGui_TextLong(const char* val);
 void skImGui_Text(const char* val);
 
 bool skImGui_MenuItem(const char* name);

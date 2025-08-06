@@ -10,8 +10,11 @@ typedef struct skEditor
     skECSState* ecsState;
     char sceneName[128];
     Bool playing;
+    const char* documentationText;
 } skEditor;
 
+skEditor skEditor_Create(skECSState* state, const char* scenePath,
+                         const char* documentationPath);
 void skEditor_DrawHierarchy(skEditor* editor);
 void skEditor_DrawInspector(skEditor* editor);
 void skEditor_DrawTray(skEditor* editor);

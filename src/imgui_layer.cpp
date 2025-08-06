@@ -364,23 +364,18 @@ bool skImGui_ColorPicker(const char* name, vec4 color)
     return ImGui::ColorPicker4(name, color);
 }
 
-void skImGui_Textf(const char* val, ...)
+void skImGui_TextLong(const char* val)
 {
-    char buffer[256]; // Adjust size as needed
-    // Initialize variable argument list
-    va_list args;
-    va_start(args, val);
-    // Use vsnprintf to safely format the string
-    vsnprintf(buffer, sizeof(buffer), val, args);
-    // Clean up the variable argument list
-    va_end(args);
-    // Call ImGui::Text with the formatted name and value
-    ImGui::Text("%s: %s", val, buffer);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    windowSize.y -= 30;
+    ImGui::BeginChild("Documentation", windowSize, true);
+    ImGui::Text("%s", val);
+    ImGui::EndChild();
 }
 
 void skImGui_Text(const char* val)
 {
-    ImGui::Text(val);
+    ImGui::Text("%s", val);
 }
 
 bool skImGui_MenuItem(const char* name)
