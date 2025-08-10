@@ -7,7 +7,7 @@
 #include <sulkan/editor.h>
 #include <sulkan/basic_components.h>
 
-static const Bool enableValidationLayers = true;
+static const Bool enableValidationLayers = false;
 
 VkVertexInputBindingDescription skVertex_GetBindingDescription()
 {
