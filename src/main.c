@@ -5,6 +5,7 @@ int main(int argc, char** argv)
 {
     skWindow window =
         skWindow_Create("Sulkan", 800, 600, false, true);
+    glfwSwapInterval(1);
 
     skRenderer renderer = skRenderer_Create(&window);
 

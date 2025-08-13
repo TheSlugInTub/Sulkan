@@ -247,6 +247,8 @@ skChooseSwapSurfaceFormat(skVector* availableFormats)
 VkPresentModeKHR
 skChooseSwapPresentMode(skVector* availablePresentModes)
 {
+    return VK_PRESENT_MODE_FIFO_KHR;
+
     for (int i = 0; i < availablePresentModes->size; i++)
     {
         VkPresentModeKHR* formatPtr =
@@ -258,8 +260,6 @@ skChooseSwapPresentMode(skVector* availablePresentModes)
             return availableMode;
         }
     }
-
-    return VK_PRESENT_MODE_FIFO_KHR;
 }
 
 #include <limits.h>
@@ -2734,7 +2734,7 @@ skRenderer skRenderer_Create(skWindow* window)
 
     renderer.skyboxObject = skRenderObject_CreateFromModel(
         &renderer, &model, 0, "res/textures/skybox.bmp",
-        "res/textures/defualt_normal.bmp",
+        "res/textures/normal.bmp",
         "res/textures/default_roughness.bmp");
 
     for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
