@@ -75,6 +75,11 @@ int main(int argc, char** argv)
 
             sprintf(fpsString, "FPS: %f", fps);
             skWindow_Rename(&window, fpsString);
+
+            if (fps < 50.0f)
+            {
+                printf("Low FPS: %f\n", fps);
+            }
         }
 
         skWindow_Update(&window);

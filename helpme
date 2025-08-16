@@ -6,7 +6,6 @@
 #include <sulkan/imgui_layer.h>
 #include <sulkan/editor.h>
 #include <sulkan/basic_components.h>
-#include <sulkan/timer.h>
 
 static const Bool enableValidationLayers = true;
 
@@ -248,6 +247,8 @@ skChooseSwapSurfaceFormat(skVector* availableFormats)
 VkPresentModeKHR
 skChooseSwapPresentMode(skVector* availablePresentModes)
 {
+    return VK_PRESENT_MODE_FIFO_KHR;
+    
     for (int i = 0; i < availablePresentModes->size; i++)
     {
         VkPresentModeKHR* formatPtr =
@@ -258,9 +259,7 @@ skChooseSwapPresentMode(skVector* availablePresentModes)
         {
             return availableMode;
         }
-    }  
-    
-    return VK_PRESENT_MODE_FIFO_KHR;
+    }
 }
 
 #include <limits.h>
@@ -1243,89 +1242,6 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
     }
 }
 
-void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
-{
-    u32 currentFrame = renderer->currentFrame;
-
-    VkFence* inFlightFence = (VkFence*)skVector_Get(
-        renderer->inFlightFences, currentFrame);
-    VkSemaphore* imageAvailableSemaphore = (VkSemaphore*)skVector_Get(
-        renderer->imageAvailableSemaphores, currentFrame);
-    VkSemaphore* renderFinishedSemaphore = (VkSemaphore*)skVector_Get(
-        renderer->renderFinishedSemaphores, currentFrame);
-    VkCommandBuffer* commandBuffer = (VkCommandBuffer*)skVector_Get(
-        renderer->commandBuffers, currentFrame);
-    VkCommandBuffer cmdBuffer = *commandBuffer;
-
-    vkWaitForFences(renderer->device, 1, inFlightFence, VK_TRUE,
-                    UINT64_MAX);
-    
-    vkResetCommandBuffer(cmdBuffer, 0);
-
-    u32      imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-        renderer->device, renderer->swapchain, UINT64_MAX,
-        *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-    skRenderer_UpdateUniformBuffers(renderer);
-    
-    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex,
-                                   editor);
-
-    vkResetFences(renderer->device, 1, inFlightFence);
-
-    VkSubmitInfo submitInfo = {0};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {*imageAvailableSemaphore};
-    VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = commandBuffer;
-
-    VkSemaphore signalSemaphores[] = {*renderFinishedSemaphore};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
-                      *inFlightFence) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to submit draw command buffer.");
-    }
-
-    VkPresentInfoKHR presentInfo = {0};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {renderer->swapchain};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = NULL;
-    
-    result = vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
-    
-    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-        result == VK_SUBOPTIMAL_KHR ||
-        renderer->window->framebufferResized)
-    {
-        renderer->window->framebufferResized = false;
-        skRenderer_RecreateSwapchain(renderer, renderer->window);
-    }
-    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-    {
-        printf("SK ERROR: Failed to acquire swapchain image.\n");
-    }
-
-    renderer->currentFrame = (currentFrame + 1) % SK_FRAMES_IN_FLIGHT;
-}
-
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
                                     u32 imageIndex, skEditor* editor)
@@ -1380,24 +1296,22 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     scissor.offset = (VkOffset2D) {0, 0};
     scissor.extent = renderer->swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    
-    size_t totalObjects = renderer->renderObjects->size;
-    
-    for (size_t i = 0; i < totalObjects; i++)
+
+    for (size_t i = 0; i < renderer->renderObjects->size; i++)
     {
         skRenderObject* obj =
             (skRenderObject*)skVector_Get(renderer->renderObjects, i);
 
         if (obj->boneTransforms != NULL)
         {
-            for (int j = 0; j < 100; j++)
+            for (int i = 0; i < 100; i++)
             {
                 mat4* mat =
-                    (mat4*)skVector_Get(obj->boneTransforms, j);
+                    (mat4*)skVector_Get(obj->boneTransforms, i);
                 memcpy(
                     (char*)renderer
                             ->boneBuffersMap[renderer->currentFrame] +
-                        (j * sizeof(mat4)),
+                        (i * sizeof(mat4)),
                     mat, sizeof(mat4));
             }
         }
@@ -1424,7 +1338,6 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
-        
     }
 
     // Skybox rendering
@@ -1485,20 +1398,21 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
             vkCmdBindIndexBuffer(commandBuffer, line->indexBuffer, 0,
                                  VK_INDEX_TYPE_UINT32);
 
-            vkCmdDrawIndexed(commandBuffer, line->indexCount, 1, 0, 0,
-                             0);
+            vkCmdDrawIndexed(commandBuffer, line->indexCount, 1, 0, 0, 0);
         }
     }
-    
+
     if (editor != NULL)
     {
         skImGui_NewFrame();
+
         skEditor_DrawHierarchy(editor);
         skEditor_DrawInspector(editor);
         skEditor_DrawTray(editor);
+
         skImGui_EndFrame(commandBuffer);
     }
-    
+
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
@@ -1728,17 +1642,8 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
     skRenderer_CreateCommandBuffers(renderer);
 }
 
-Bool f = false;
-
 void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 {
-    mat4 proj;
-    glm_perspective(glm_rad(80.0f),
-                    renderer->swapchainExtent.width /
-                        (float)renderer->swapchainExtent.height,
-                    0.001f, 1000.0f, proj);
-    proj[1][1] *= -1.0f;
-
     for (size_t i = 0; i < renderer->renderObjects->size; i++)
     {
         skRenderObject* obj =
@@ -1750,6 +1655,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 
         glm_mat4_copy(renderer->viewTransform, ubo.view);
 
+        mat4 proj;
+        glm_perspective(glm_rad(80.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.001f, 1000.0f, proj);
+        proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
         memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
@@ -1801,6 +1712,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     glm_mat4_copy(viewNoTranslation, skyboxUbo.view);
 
     // Projection (same as regular objects)
+    mat4 proj;
+    glm_perspective(glm_rad(80.0f),
+                    renderer->swapchainExtent.width /
+                        (float)renderer->swapchainExtent.height,
+                    0.001f, 1000.0f, proj);
+    proj[1][1] *= -1.0f;
     glm_mat4_copy(proj, skyboxUbo.proj);
 
     memcpy(renderer->skyboxObject
@@ -1815,14 +1732,101 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         skUniformBufferObject ubo = {0};
 
         glm_mat4_copy(line->transform, ubo.model);
-
+        
         glm_mat4_copy(renderer->viewTransform, ubo.view);
 
+        mat4 proj;
+        glm_perspective(glm_rad(80.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.001f, 1000.0f, proj);
+        proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
         memcpy(line->uniformBuffersMap[renderer->currentFrame], &ubo,
                sizeof(ubo));
     }
+}
+
+void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
+{
+    u32 currentFrame = renderer->currentFrame;
+
+    VkFence* inFlightFence = (VkFence*)skVector_Get(
+        renderer->inFlightFences, currentFrame);
+    VkSemaphore* imageAvailableSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->imageAvailableSemaphores, currentFrame);
+    VkSemaphore* renderFinishedSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->renderFinishedSemaphores, currentFrame);
+    VkCommandBuffer* commandBuffer = (VkCommandBuffer*)skVector_Get(
+        renderer->commandBuffers, currentFrame);
+    VkCommandBuffer cmdBuffer = *commandBuffer;
+
+    vkWaitForFences(renderer->device, 1, inFlightFence, VK_TRUE,
+                    UINT64_MAX);
+
+    u32      imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        renderer->device, renderer->swapchain, UINT64_MAX,
+        *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    skRenderer_UpdateUniformBuffers(renderer);
+
+    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex,
+                                   editor);
+
+    vkResetFences(renderer->device, 1, inFlightFence);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {*imageAvailableSemaphore};
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = commandBuffer;
+
+    VkSemaphore signalSemaphores[] = {*renderFinishedSemaphore};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
+                      *inFlightFence) != VK_SUCCESS)
+    {
+        printf("SK ERROR: Failed to submit draw command buffer.");
+    }
+
+    VkPresentInfoKHR presentInfo = {0};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {renderer->swapchain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = NULL;
+
+    result = vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        result == VK_SUBOPTIMAL_KHR ||
+        renderer->window->framebufferResized)
+    {
+        renderer->window->framebufferResized = false;
+        skRenderer_RecreateSwapchain(renderer, renderer->window);
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        printf("SK ERROR: Failed to acquire swapchain image.\n");
+    }
+
+    renderer->currentFrame = (currentFrame + 1) % SK_FRAMES_IN_FLIGHT;
 }
 
 void skRenderer_CreateInstance(skRenderer* renderer)
@@ -2965,7 +2969,7 @@ skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
                 stbi_load("res/textures/image.bmp", &texWidth,
                           &texHeight, &texChannels, STBI_rgb_alpha);
         }
-
+        
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         VkBuffer       imageStagingBuffer;

@@ -20,4 +20,5 @@ void skEditor_DrawInspector(skEditor* editor);
 void skEditor_DrawTray(skEditor* editor);
 
 void skEditor_SaveScene(skECSState* state);
-void skEditor_LoadScene(skECSState* state);
+void skEditor_LoadScene(skECSState* state, skSceneHandle scene,
+                        const char* filepath);

@@ -11,3 +11,4 @@
 #include <sulkan/extra_systems.h>
 #include <sulkan/animation.h>
 #include <sulkan/physics_3d.h>
+#include <sulkan/input.h>

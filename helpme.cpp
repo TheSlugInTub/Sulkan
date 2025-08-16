@@ -6,224 +6,6 @@
 #include <sulkan/imgui_layer.h>
 #include <sulkan/editor.h>
 #include <sulkan/basic_components.h>
-#include <sulkan/timer.h>
-
-static const Bool enableValidationLayers = true;
-
-VkVertexInputBindingDescription skVertex_GetBindingDescription()
-{
-    VkVertexInputBindingDescription description = {0};
-
-    description.binding = 0;
-    description.stride = sizeof(skVertex);
-    description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    return description;
-}
-
-typedef struct VkVertexInputAttributeDescriptions
-{
-    VkVertexInputAttributeDescription descriptions[7];
-} VkVertexInputAttributeDescriptions;
-
-VkVertexInputAttributeDescriptions skVertex_GetAttributeDescription()
-{
-    VkVertexInputAttributeDescription descriptions[7] = {0};
-
-    descriptions[0].binding = 0;
-    descriptions[0].location = 0;
-    descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[0].offset = offsetof(skVertex, position);
-
-    descriptions[1].binding = 0;
-    descriptions[1].location = 1;
-    descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[1].offset = offsetof(skVertex, normal);
-
-    descriptions[2].binding = 0;
-    descriptions[2].location = 2;
-    descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    descriptions[2].offset = offsetof(skVertex, textureCoordinates);
-
-    descriptions[3].binding = 0;
-    descriptions[3].location = 3;
-    descriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[3].offset = offsetof(skVertex, tangent);
-
-    descriptions[4].binding = 0;
-    descriptions[4].location = 4;
-    descriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
-    descriptions[4].offset = offsetof(skVertex, bitangent);
-
-    descriptions[5].binding = 0;
-    descriptions[5].location = 5;
-    descriptions[5].format = VK_FORMAT_R32G32B32A32_SINT;
-    descriptions[5].offset = offsetof(skVertex, boneIDs);
-
-    descriptions[6].binding = 0;
-    descriptions[6].location = 6;
-    descriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    descriptions[6].offset = offsetof(skVertex, weights);
-
-    VkVertexInputAttributeDescriptions pair = {
-        descriptions[0], descriptions[1], descriptions[2],
-        descriptions[3], descriptions[4], descriptions[5],
-        descriptions[6]};
-
-    return pair;
-}
-
-char* skReadFile(const char* filePath, u32* len)
-{
-    FILE* shaderStream = fopen(filePath, "rb");
-    if (shaderStream == NULL)
-    {
-        printf("SK ERROR: Failed to open file.");
-    }
-
-    fseek(shaderStream, 0, SEEK_END);
-    size_t length = ftell(shaderStream);
-    fseek(shaderStream, 0, SEEK_SET);
-
-    char* shaderCode = (char*)malloc(length);
-    fread(shaderCode, sizeof(char), length, shaderStream);
-    fclose(shaderStream);
-
-    *len = length;
-    return shaderCode;
-}
-
-VkShaderModule skCreateShaderModule(skRenderer* renderer,
-                                    char* buffer, u32 len)
-{
-    VkShaderModuleCreateInfo createInfo = {0};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = len;
-    createInfo.pCode = (const u32*)buffer;
-
-    if (len % 4 != 0)
-    {
-        printf("SK ERROR: Shader code size must be multiple of 4 "
-               "bytes for SPIR-V\n");
-        return VK_NULL_HANDLE;
-    }
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(renderer->device, &createInfo, NULL,
-                             &shaderModule) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create shader module.");
-    }
-
-    return shaderModule;
-}
-
-// Standard validation layer
-static const char* validationLayers[] = {
-    "VK_LAYER_KHRONOS_validation"};
-
-static const u32 validationLayerCount =
-    sizeof(validationLayers) / sizeof(validationLayers[0]);
-
-// Debug callback function
-static VKAPI_ATTR VkBool32 VKAPI_CALL skDebugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT             messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void*                                       pUserData)
-{
-
-    printf("VALIDATION LAYER: %s\n", pCallbackData->pMessage);
-    return VK_FALSE;
-}
-
-// Helper function to create debug messenger
-VkResult skCreateDebugUtilsMessengerEXT(
-    VkInstance                                instance,
-    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-    const VkAllocationCallbacks*              pAllocator,
-    VkDebugUtilsMessengerEXT*                 pDebugMessenger)
-{
-    PFN_vkCreateDebugUtilsMessengerEXT func =
-        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            instance, "vkCreateDebugUtilsMessengerEXT");
-    if (func != NULL)
-    {
-        return func(instance, pCreateInfo, pAllocator,
-                    pDebugMessenger);
-    }
-    else
-    {
-        return VK_ERROR_EXTENSION_NOT_PRESENT;
-    }
-}
-
-// Helper function to destroy debug messenger
-void skDestroyDebugUtilsMessengerEXT(
-    VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-    const VkAllocationCallbacks* pAllocator)
-{
-    PFN_vkDestroyDebugUtilsMessengerEXT func =
-        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func != NULL)
-    {
-        func(instance, debugMessenger, pAllocator);
-    }
-}
-
-// Function to check if validation layers are available
-Bool skCheckValidationLayerSupport()
-{
-    u32 layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, NULL);
-
-    VkLayerProperties* availableLayers = (VkLayerProperties*)malloc(
-        layerCount * sizeof(VkLayerProperties));
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
-
-    for (u32 i = 0; i < validationLayerCount; i++)
-    {
-        Bool layerFound = false;
-
-        for (u32 j = 0; j < layerCount; j++)
-        {
-            if (strcmp(validationLayers[i],
-                       availableLayers[j].layerName) == 0)
-            {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound)
-        {
-            free(availableLayers);
-            return false;
-        }
-    }
-
-    free(availableLayers);
-    return true;
-}
-
-// Function to populate debug messenger create info
-void skPopulateDebugMessengerCreateInfo(
-    VkDebugUtilsMessengerCreateInfoEXT* createInfo)
-{
-    createInfo->sType =
-        VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo->messageSeverity =
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo->messageType =
-        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo->pfnUserCallback = skDebugCallback;
-    createInfo->pUserData = NULL;
-}
 
 VkSurfaceFormatKHR
 skChooseSwapSurfaceFormat(skVector* availableFormats)
@@ -248,6 +30,8 @@ skChooseSwapSurfaceFormat(skVector* availableFormats)
 VkPresentModeKHR
 skChooseSwapPresentMode(skVector* availablePresentModes)
 {
+    return VK_PRESENT_MODE_FIFO_KHR;
+    
     for (int i = 0; i < availablePresentModes->size; i++)
     {
         VkPresentModeKHR* formatPtr =
@@ -258,25 +42,7 @@ skChooseSwapPresentMode(skVector* availablePresentModes)
         {
             return availableMode;
         }
-    }  
-    
-    return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-#include <limits.h>
-
-u32 skClampU32(u32 val, u32 low, u32 high)
-{
-    if (val < low)
-    {
-        return low;
     }
-    else if (val > high)
-    {
-        return high;
-    }
-
-    return val;
 }
 
 VkExtent2D skChooseSwapExtent(VkSurfaceCapabilitiesKHR* capabilities,
@@ -644,199 +410,6 @@ void skRenderer_CreateGraphicsPipeline(skRenderer* renderer)
     if (vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1,
                                   &pipelineInfo, NULL,
                                   &renderer->pipeline) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create graphics pipeline.\n");
-    }
-}
-
-void skRenderer_CreateSkyboxGraphicsPipeline(skRenderer* renderer)
-{
-    u32   vertLen, fragLen;
-    char* vertShaderCode =
-        skReadFile("shaders/skybox_vert.spv", &vertLen);
-    char* fragShaderCode =
-        skReadFile("shaders/skybox_frag.spv", &fragLen);
-
-    VkShaderModule vertMod =
-        skCreateShaderModule(renderer, vertShaderCode, vertLen);
-    VkShaderModule fragMod =
-        skCreateShaderModule(renderer, fragShaderCode, fragLen);
-
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {0};
-    vertShaderStageInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-
-    vertShaderStageInfo.module = vertMod;
-    vertShaderStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {0};
-    fragShaderStageInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragMod;
-    fragShaderStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
-        vertShaderStageInfo, fragShaderStageInfo};
-
-    VkVertexInputBindingDescription bindingDescription =
-        skVertex_GetBindingDescription();
-    VkVertexInputAttributeDescriptions attributeDescriptions =
-        skVertex_GetAttributeDescription();
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
-    vertexInputInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = 7;
-    vertexInputInfo.pVertexAttributeDescriptions =
-        attributeDescriptions.descriptions;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-
-    VkDynamicState dynamicStates[2] = {VK_DYNAMIC_STATE_VIEWPORT,
-                                       VK_DYNAMIC_STATE_SCISSOR};
-
-    VkPipelineDynamicStateCreateInfo dynamicState = {0};
-    dynamicState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = 2;
-    dynamicState.pDynamicStates = dynamicStates;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
-    inputAssembly.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkViewport viewport = {0};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)renderer->swapchainExtent.width;
-    viewport.height = (float)renderer->swapchainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor = {0};
-    scissor.offset = (VkOffset2D) {0, 0};
-    scissor.extent = renderer->swapchainExtent;
-
-    VkPipelineViewportStateCreateInfo viewportState = {0};
-    viewportState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer = {0};
-    rasterizer.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 0.0f;
-    rasterizer.depthBiasClamp = 0.0f;
-    rasterizer.depthBiasSlopeFactor = 0.0f;
-
-    VkPipelineMultisampleStateCreateInfo multisampling = {0};
-    multisampling.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f;
-    multisampling.pSampleMask = NULL;
-    multisampling.alphaToCoverageEnable = VK_FALSE;
-    multisampling.alphaToOneEnable = VK_FALSE;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
-    colorBlendAttachment.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-    colorBlendAttachment.blendEnable = VK_TRUE;
-    colorBlendAttachment.srcColorBlendFactor =
-        VK_BLEND_FACTOR_SRC_ALPHA;
-    colorBlendAttachment.dstColorBlendFactor =
-        VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-    VkPipelineColorBlendStateCreateInfo colorBlending = {0};
-    colorBlending.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
-    pipelineLayoutInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 3;
-    VkDescriptorSetLayout layouts[] = {
-        renderer->descriptorSetLayout,
-        renderer->lightDescriptorSetLayout,
-        renderer->uniformDescriptorSetLayout};
-    pipelineLayoutInfo.pSetLayouts = layouts;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    pipelineLayoutInfo.pPushConstantRanges = NULL;
-
-    if (vkCreatePipelineLayout(
-            renderer->device, &pipelineLayoutInfo, NULL,
-            &renderer->skyboxPipelineLayout) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create pipeline layout.\n");
-    }
-
-    VkGraphicsPipelineCreateInfo pipelineInfo = {0};
-    pipelineInfo.sType =
-        VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-
-    pipelineInfo.layout = renderer->skyboxPipelineLayout;
-
-    pipelineInfo.renderPass = renderer->renderPass;
-    pipelineInfo.subpass = 0;
-
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex = -1;
-
-    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
-    depthStencil.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.minDepthBounds = 0.0f; // Optional
-    depthStencil.maxDepthBounds = 1.0f; // Optional
-    depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = (VkStencilOpState) {0};
-    depthStencil.back = (VkStencilOpState) {0};
-
-    pipelineInfo.pDepthStencilState = &depthStencil;
-
-    if (vkCreateGraphicsPipelines(
-            renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL,
-            &renderer->skyboxPipeline) != VK_SUCCESS)
     {
         printf("SK ERROR: Failed to create graphics pipeline.\n");
     }
@@ -1243,89 +816,6 @@ void skRenderer_CreateCommandPool(skRenderer* renderer)
     }
 }
 
-void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
-{
-    u32 currentFrame = renderer->currentFrame;
-
-    VkFence* inFlightFence = (VkFence*)skVector_Get(
-        renderer->inFlightFences, currentFrame);
-    VkSemaphore* imageAvailableSemaphore = (VkSemaphore*)skVector_Get(
-        renderer->imageAvailableSemaphores, currentFrame);
-    VkSemaphore* renderFinishedSemaphore = (VkSemaphore*)skVector_Get(
-        renderer->renderFinishedSemaphores, currentFrame);
-    VkCommandBuffer* commandBuffer = (VkCommandBuffer*)skVector_Get(
-        renderer->commandBuffers, currentFrame);
-    VkCommandBuffer cmdBuffer = *commandBuffer;
-
-    vkWaitForFences(renderer->device, 1, inFlightFence, VK_TRUE,
-                    UINT64_MAX);
-    
-    vkResetCommandBuffer(cmdBuffer, 0);
-
-    u32      imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-        renderer->device, renderer->swapchain, UINT64_MAX,
-        *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-
-    skRenderer_UpdateUniformBuffers(renderer);
-    
-    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex,
-                                   editor);
-
-    vkResetFences(renderer->device, 1, inFlightFence);
-
-    VkSubmitInfo submitInfo = {0};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {*imageAvailableSemaphore};
-    VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = commandBuffer;
-
-    VkSemaphore signalSemaphores[] = {*renderFinishedSemaphore};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
-                      *inFlightFence) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to submit draw command buffer.");
-    }
-
-    VkPresentInfoKHR presentInfo = {0};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {renderer->swapchain};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = NULL;
-    
-    result = vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
-    
-    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-        result == VK_SUBOPTIMAL_KHR ||
-        renderer->window->framebufferResized)
-    {
-        renderer->window->framebufferResized = false;
-        skRenderer_RecreateSwapchain(renderer, renderer->window);
-    }
-    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-    {
-        printf("SK ERROR: Failed to acquire swapchain image.\n");
-    }
-
-    renderer->currentFrame = (currentFrame + 1) % SK_FRAMES_IN_FLIGHT;
-}
-
 void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
                                     VkCommandBuffer commandBuffer,
                                     u32 imageIndex, skEditor* editor)
@@ -1380,24 +870,22 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
     scissor.offset = (VkOffset2D) {0, 0};
     scissor.extent = renderer->swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    
-    size_t totalObjects = renderer->renderObjects->size;
-    
-    for (size_t i = 0; i < totalObjects; i++)
+
+    for (size_t i = 0; i < renderer->renderObjects->size; i++)
     {
         skRenderObject* obj =
             (skRenderObject*)skVector_Get(renderer->renderObjects, i);
 
         if (obj->boneTransforms != NULL)
         {
-            for (int j = 0; j < 100; j++)
+            for (int i = 0; i < 100; i++)
             {
                 mat4* mat =
-                    (mat4*)skVector_Get(obj->boneTransforms, j);
+                    (mat4*)skVector_Get(obj->boneTransforms, i);
                 memcpy(
                     (char*)renderer
                             ->boneBuffersMap[renderer->currentFrame] +
-                        (j * sizeof(mat4)),
+                        (i * sizeof(mat4)),
                     mat, sizeof(mat4));
             }
         }
@@ -1424,7 +912,6 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
 
         // Draw this object
         vkCmdDrawIndexed(commandBuffer, obj->indexCount, 1, 0, 0, 0);
-        
     }
 
     // Skybox rendering
@@ -1485,20 +972,21 @@ void skRenderer_RecordCommandBuffer(skRenderer*     renderer,
             vkCmdBindIndexBuffer(commandBuffer, line->indexBuffer, 0,
                                  VK_INDEX_TYPE_UINT32);
 
-            vkCmdDrawIndexed(commandBuffer, line->indexCount, 1, 0, 0,
-                             0);
+            vkCmdDrawIndexed(commandBuffer, line->indexCount, 1, 0, 0, 0);
         }
     }
-    
+
     if (editor != NULL)
     {
         skImGui_NewFrame();
+
         skEditor_DrawHierarchy(editor);
         skEditor_DrawInspector(editor);
         skEditor_DrawTray(editor);
+
         skImGui_EndFrame(commandBuffer);
     }
-    
+
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
@@ -1728,17 +1216,8 @@ void skRenderer_RecreateSwapchain(skRenderer* renderer,
     skRenderer_CreateCommandBuffers(renderer);
 }
 
-Bool f = false;
-
 void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 {
-    mat4 proj;
-    glm_perspective(glm_rad(80.0f),
-                    renderer->swapchainExtent.width /
-                        (float)renderer->swapchainExtent.height,
-                    0.001f, 1000.0f, proj);
-    proj[1][1] *= -1.0f;
-
     for (size_t i = 0; i < renderer->renderObjects->size; i++)
     {
         skRenderObject* obj =
@@ -1750,6 +1229,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
 
         glm_mat4_copy(renderer->viewTransform, ubo.view);
 
+        mat4 proj;
+        glm_perspective(glm_rad(80.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.001f, 1000.0f, proj);
+        proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
         memcpy(obj->uniformBuffersMap[renderer->currentFrame], &ubo,
@@ -1801,6 +1286,12 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     glm_mat4_copy(viewNoTranslation, skyboxUbo.view);
 
     // Projection (same as regular objects)
+    mat4 proj;
+    glm_perspective(glm_rad(80.0f),
+                    renderer->swapchainExtent.width /
+                        (float)renderer->swapchainExtent.height,
+                    0.001f, 1000.0f, proj);
+    proj[1][1] *= -1.0f;
     glm_mat4_copy(proj, skyboxUbo.proj);
 
     memcpy(renderer->skyboxObject
@@ -1815,9 +1306,15 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
         skUniformBufferObject ubo = {0};
 
         glm_mat4_copy(line->transform, ubo.model);
-
+        
         glm_mat4_copy(renderer->viewTransform, ubo.view);
 
+        mat4 proj;
+        glm_perspective(glm_rad(80.0f),
+                        renderer->swapchainExtent.width /
+                            (float)renderer->swapchainExtent.height,
+                        0.001f, 1000.0f, proj);
+        proj[1][1] *= -1.0f;
         glm_mat4_copy(proj, ubo.proj);
 
         memcpy(line->uniformBuffersMap[renderer->currentFrame], &ubo,
@@ -1825,78 +1322,85 @@ void skRenderer_UpdateUniformBuffers(skRenderer* renderer)
     }
 }
 
-void skRenderer_CreateInstance(skRenderer* renderer)
+void skRenderer_DrawFrame(skRenderer* renderer, skEditor* editor)
 {
-    if (enableValidationLayers && !skCheckValidationLayerSupport())
+    u32 currentFrame = renderer->currentFrame;
+
+    VkFence* inFlightFence = (VkFence*)skVector_Get(
+        renderer->inFlightFences, currentFrame);
+    VkSemaphore* imageAvailableSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->imageAvailableSemaphores, currentFrame);
+    VkSemaphore* renderFinishedSemaphore = (VkSemaphore*)skVector_Get(
+        renderer->renderFinishedSemaphores, currentFrame);
+    VkCommandBuffer* commandBuffer = (VkCommandBuffer*)skVector_Get(
+        renderer->commandBuffers, currentFrame);
+    VkCommandBuffer cmdBuffer = *commandBuffer;
+
+    vkWaitForFences(renderer->device, 1, inFlightFence, VK_TRUE,
+                    UINT64_MAX);
+
+    u32      imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        renderer->device, renderer->swapchain, UINT64_MAX,
+        *imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    skRenderer_UpdateUniformBuffers(renderer);
+
+    skRenderer_RecordCommandBuffer(renderer, cmdBuffer, imageIndex,
+                                   editor);
+
+    vkResetFences(renderer->device, 1, inFlightFence);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {*imageAvailableSemaphore};
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = commandBuffer;
+
+    VkSemaphore signalSemaphores[] = {*renderFinishedSemaphore};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(renderer->graphicsQueue, 1, &submitInfo,
+                      *inFlightFence) != VK_SUCCESS)
     {
-        printf("SK ERROR: Validation layers requested, but not "
-               "available.\n");
+        printf("SK ERROR: Failed to submit draw command buffer.");
     }
 
-    // Send information about our application to the Vulkan API
-    VkApplicationInfo appInfo = {0};
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Sulkan";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "Sulkan";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    VkPresentInfoKHR presentInfo = {0};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    VkInstanceCreateInfo createInfo = {0};
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
 
-    u32          glfwExtensionCount = 0;
-    const char** glfwExtensions;
+    VkSwapchainKHR swapChains[] = {renderer->swapchain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = NULL;
 
-    // Get required vulkan extensions from GLFW
-    glfwExtensions =
-        glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    result = vkQueuePresentKHR(renderer->presentQueue, &presentInfo);
 
-    // Create extensions array with space for other extensions
-    u32          extensionCount = glfwExtensionCount;
-    const char** extensions = (const char**)malloc(
-        (glfwExtensionCount + 1) * sizeof(const char*));
-
-    for (u32 i = 0; i < glfwExtensionCount; i++)
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        result == VK_SUBOPTIMAL_KHR ||
+        renderer->window->framebufferResized)
     {
-        extensions[i] = glfwExtensions[i];
+        renderer->window->framebufferResized = false;
+        skRenderer_RecreateSwapchain(renderer, renderer->window);
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        printf("SK ERROR: Failed to acquire swapchain image.\n");
     }
 
-    if (enableValidationLayers)
-    {
-        // Enable the validation layer extension
-        extensions[extensionCount++] =
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-    }
-
-    createInfo.enabledExtensionCount = extensionCount;
-    createInfo.ppEnabledExtensionNames = extensions;
-
-    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {0};
-    if (enableValidationLayers)
-    {
-        createInfo.enabledLayerCount = validationLayerCount;
-        createInfo.ppEnabledLayerNames = validationLayers;
-
-        skPopulateDebugMessengerCreateInfo(&debugCreateInfo);
-        createInfo.pNext =
-            (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-    }
-    else
-    {
-        createInfo.enabledLayerCount = 0;
-        createInfo.pNext = NULL;
-    }
-
-    // Create the instance
-    if (vkCreateInstance(&createInfo, NULL, &renderer->instance) !=
-        VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create Vulkan instance.\n");
-    }
-
-    free(extensions);
+    renderer->currentFrame = (currentFrame + 1) % SK_FRAMES_IN_FLIGHT;
 }
 
 void skRenderer_CreateSurface(skRenderer* renderer, skWindow* window)
@@ -1907,191 +1411,6 @@ void skRenderer_CreateSurface(skRenderer* renderer, skWindow* window)
     {
         printf("SK ERROR: Failed to create window surface.");
     }
-}
-
-void skRenderer_CreatePhysicalDevice(skRenderer* renderer)
-{
-    u32 deviceCount = 0;
-
-    // First call: get the number of devices
-    vkEnumeratePhysicalDevices(renderer->instance, &deviceCount,
-                               NULL);
-
-    if (deviceCount == 0)
-    {
-        printf("SK ERROR: No physical device found.\n");
-        exit(1);
-    }
-
-    // Create vector with the correct size
-    skVector* physicalDevices =
-        skVector_Create(sizeof(VkPhysicalDevice), deviceCount);
-
-    // Second call: get the actual devices
-    vkEnumeratePhysicalDevices(
-        renderer->instance, &deviceCount,
-        (VkPhysicalDevice*)physicalDevices->data);
-
-    // Update the vector's size to reflect the actual number of
-    // devices
-    physicalDevices->size = deviceCount;
-
-    for (int i = 0; i < physicalDevices->size; i++)
-    {
-        VkPhysicalDevice* devicePtr =
-            (VkPhysicalDevice*)skVector_Get(physicalDevices, i);
-        VkPhysicalDevice device = *devicePtr;
-
-        if (skRenderer_IsDeviceSuitable(device, renderer->surface))
-        {
-            renderer->physicalDevice = device;
-            break; // Found a suitable device, no need to continue
-        }
-    }
-
-    if (renderer->physicalDevice == VK_NULL_HANDLE)
-    {
-        printf(
-            "SK ERROR: Failed to find a suitable physical device.\n");
-    }
-}
-
-void skRenderer_CreateLogicalDevice(skRenderer* renderer)
-{
-    skQueueFamilyIndices indices = skFindQueueFamilies(
-        renderer->physicalDevice, renderer->surface);
-
-    // Create queue create infos for unique queue families
-    skVector* queueCreateInfos =
-        skVector_Create(sizeof(VkDeviceQueueCreateInfo), 2);
-
-    u32 uniqueQueueFamilies[2];
-    int uniqueCount = 0;
-
-    // Add graphics family
-    uniqueQueueFamilies[uniqueCount++] = indices.graphicsFamily;
-
-    // Add present family only if it's different from graphics family
-    if (indices.presentFamily != indices.graphicsFamily)
-    {
-        uniqueQueueFamilies[uniqueCount++] = indices.presentFamily;
-    }
-
-    float queuePriority = 1.0f;
-    for (int i = 0; i < uniqueCount; i++)
-    {
-        VkDeviceQueueCreateInfo queueCreateInfo = {0};
-        queueCreateInfo.sType =
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = uniqueQueueFamilies[i];
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-
-        skVector_PushBack(queueCreateInfos, &queueCreateInfo);
-    }
-
-    VkPhysicalDeviceFeatures deviceFeatures = {0};
-
-    // Define required device extensions
-    const char* deviceExtensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-        VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
-        VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
-
-    deviceFeatures.wideLines = VK_TRUE;
-
-    VkDeviceCreateInfo deviceCreateInfo = {0};
-    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos =
-        (VkDeviceQueueCreateInfo*)queueCreateInfos->data;
-    deviceCreateInfo.queueCreateInfoCount =
-        (u32)queueCreateInfos->size;
-    deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-
-    // Enable swapchain extension
-    deviceCreateInfo.enabledExtensionCount = 4;
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
-
-    if (enableValidationLayers)
-    {
-        deviceCreateInfo.enabledLayerCount = validationLayerCount;
-        deviceCreateInfo.ppEnabledLayerNames = validationLayers;
-    }
-    else
-    {
-        deviceCreateInfo.enabledLayerCount = 0;
-    }
-
-    if (vkCreateDevice(renderer->physicalDevice, &deviceCreateInfo,
-                       NULL, &renderer->device) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create logical device.");
-    }
-
-    // Get the queue handles
-    vkGetDeviceQueue(renderer->device, indices.graphicsFamily, 0,
-                     &renderer->graphicsQueue);
-    vkGetDeviceQueue(renderer->device, indices.presentFamily, 0,
-                     &renderer->presentQueue);
-
-    // Clean up
-    skVector_Free(queueCreateInfos);
-}
-
-void skRenderer_CreateDebugMessenger(skRenderer* renderer)
-{
-    // Setup debug messenger
-    if (enableValidationLayers)
-    {
-        VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo =
-            {0};
-        skPopulateDebugMessengerCreateInfo(&debugMessengerCreateInfo);
-
-        if (skCreateDebugUtilsMessengerEXT(
-                renderer->instance, &debugMessengerCreateInfo, NULL,
-                &renderer->debugMessenger) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to set up debug messenger!\n");
-        }
-    }
-}
-
-void skRenderer_CreateBuffer(skRenderer* renderer, size_t size,
-                             VkBufferUsageFlags    usage,
-                             VkMemoryPropertyFlags properties,
-                             VkBuffer*             buffer,
-                             VkDeviceMemory*       bufferMemory)
-{
-    VkBufferCreateInfo bufferInfo = {0};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(renderer->device, &bufferInfo, NULL, buffer) !=
-        VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to create buffer.\n");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(renderer->device, *buffer,
-                                  &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = skRenderer_FindMemoryType(
-        renderer, memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(renderer->device, &allocInfo, NULL,
-                         bufferMemory) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to allocate buffer memory.");
-    }
-
-    vkBindBufferMemory(renderer->device, *buffer, *bufferMemory, 0);
 }
 
 VkCommandBuffer
@@ -2866,865 +2185,4 @@ void skRenderer_CreateTexture(skRenderer*    renderer,
     {
         printf("SK ERROR: Failed to create texture sampler.");
     }
-}
-
-skRenderObject
-skRenderObject_CreateFromModel(skRenderer* renderer, skModel* model,
-                               int meshIndex, const char* texturePath,
-                               const char* normalTexturePath,
-                               const char* roughnessTexturePath)
-{
-    skRenderObject obj = {0};
-
-    // Create vertex buffer
-
-    skMesh* mesh = skVector_Get(model->meshes, 0);
-    u16     numVertices = mesh->vertices->size;
-
-    obj.indexCount = mesh->indices->size;
-
-    size_t bufferSize = sizeof(skVertex) * numVertices;
-
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &stagingBuffer, &stagingMemory);
-
-    void* data;
-    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
-                &data);
-
-    memcpy(data, mesh->vertices->data,
-           sizeof(skVertex) * numVertices);
-
-    vkUnmapMemory(renderer->device, stagingMemory);
-
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &obj.vertexBuffer,
-                            &obj.vertexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, stagingBuffer, obj.vertexBuffer,
-                          bufferSize);
-
-    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
-    vkFreeMemory(renderer->device, stagingMemory, NULL);
-
-    // Create index buffer
-
-    size_t indexBufferSize =
-        sizeof(mesh->indices[0]) * obj.indexCount;
-
-    VkBuffer       indexStagingBuffer;
-    VkDeviceMemory indexStagingMemory;
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &indexStagingBuffer, &indexStagingMemory);
-
-    void* indexData;
-    vkMapMemory(renderer->device, indexStagingMemory, 0,
-                indexBufferSize, 0, &indexData);
-
-    memcpy(indexData, mesh->indices->data,
-           sizeof(u32) * obj.indexCount);
-
-    vkUnmapMemory(renderer->device, indexStagingMemory);
-
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &obj.indexBuffer, &obj.indexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
-                          obj.indexBuffer, indexBufferSize);
-
-    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
-    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
-
-    // Create texture image
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(texturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-
-        if (!pixels)
-        {
-            printf("SK ERROR: Failed to load texture image.");
-            pixels =
-                stbi_load("res/textures/image.bmp", &texWidth,
-                          &texHeight, &texChannels, STBI_rgb_alpha);
-        }
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
-            &obj.textureImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(
-            renderer, imageStagingBuffer, obj.textureImage,
-            (u32)(texWidth), (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.textureImageView = skRenderer_CreateImageView(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.textureSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create texture sampler.");
-        }
-    }
-
-    glm_mat4_identity(obj.transform);
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(normalTexturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-
-        if (!pixels)
-        {
-            printf("SK ERROR: Failed to load texture image.");
-            pixels =
-                stbi_load("res/textures/normal.bmp", &texWidth,
-                          &texHeight, &texChannels, STBI_rgb_alpha);
-        }
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
-            &obj.normalImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                     obj.normalImage, (u32)(texWidth),
-                                     (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.normalImageView = skRenderer_CreateImageView(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.normalSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create normal sampler.");
-        }
-    }
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(roughnessTexturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-
-        if (!pixels)
-        {
-            printf(
-                "SK ERROR: Failed to load roughness texture image.");
-            pixels = stbi_load("res/textures/default_roughness.bmp",
-                               &texWidth, &texHeight, &texChannels,
-                               STBI_rgb_alpha);
-        }
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
-            &obj.roughnessImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(
-            renderer, imageStagingBuffer, obj.roughnessImage,
-            (u32)(texWidth), (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.roughnessImageView = skRenderer_CreateImageView(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.roughnessSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create normal sampler.");
-        }
-    }
-
-    return obj;
-}
-
-skRenderObject skRenderObject_CreateFromSprite(
-    skRenderer* renderer, const char* texturePath,
-    const char* normalTexturePath, const char* roughnessTexturePath)
-{
-    skRenderObject obj = {0};
-
-    u16 numVertices = 4;
-
-    const skVertex vertices[] = {
-        {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-        {{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-        {{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-        {{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    };
-
-    size_t vertexBufferSize = sizeof(skVertex) * numVertices;
-
-    VkBuffer       vertexStagingBuffer;
-    VkDeviceMemory vertexStagingMemory;
-    skRenderer_CreateBuffer(
-        renderer, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &vertexStagingBuffer, &vertexStagingMemory);
-
-    void* vertexData;
-    vkMapMemory(renderer->device, vertexStagingMemory, 0,
-                vertexBufferSize, 0, &vertexData);
-
-    memcpy(vertexData, vertices, vertexBufferSize);
-
-    vkUnmapMemory(renderer->device, vertexStagingMemory);
-
-    skRenderer_CreateBuffer(renderer, vertexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &obj.vertexBuffer,
-                            &obj.vertexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, vertexStagingBuffer,
-                          obj.vertexBuffer, vertexBufferSize);
-
-    vkDestroyBuffer(renderer->device, vertexStagingBuffer, NULL);
-    vkFreeMemory(renderer->device, vertexStagingMemory, NULL);
-
-    // Create index buffer
-
-    const u32 indices[] = {0, 2, 1, 2, 0, 3};
-
-    u32 numIndices = 6;
-
-    obj.indexCount = 6;
-
-    size_t indexBufferSize = sizeof(indices[0]) * numIndices;
-
-    VkBuffer       indexStagingBuffer;
-    VkDeviceMemory indexStagingMemory;
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &indexStagingBuffer, &indexStagingMemory);
-
-    void* indexData;
-    vkMapMemory(renderer->device, indexStagingMemory, 0,
-                indexBufferSize, 0, &indexData);
-
-    memcpy(indexData, indices, sizeof(indices));
-
-    vkUnmapMemory(renderer->device, indexStagingMemory);
-
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &obj.indexBuffer, &obj.indexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
-                          obj.indexBuffer, indexBufferSize);
-
-    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
-    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
-
-    // Create texture image
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(texturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        if (!pixels)
-        {
-            printf("SK ERROR: Failed to load texture image.");
-        }
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.textureImage,
-            &obj.textureImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(
-            renderer, imageStagingBuffer, obj.textureImage,
-            (u32)(texWidth), (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.textureImageView = skRenderer_CreateImageView(
-            renderer, obj.textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.textureSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create texture sampler.");
-        }
-
-        glm_mat4_identity(obj.transform);
-    }
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(normalTexturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-
-        if (!pixels)
-        {
-            printf("SK ERROR: Failed to load texture image.");
-            pixels =
-                stbi_load("res/textures/normal.bmp", &texWidth,
-                          &texHeight, &texChannels, STBI_rgb_alpha);
-        }
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.normalImage,
-            &obj.normalImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(renderer, imageStagingBuffer,
-                                     obj.normalImage, (u32)(texWidth),
-                                     (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.normalImageView = skRenderer_CreateImageView(
-            renderer, obj.normalImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.normalSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create normal sampler.");
-        }
-    }
-
-    {
-
-        int      texWidth, texHeight, texChannels;
-        stbi_uc* pixels =
-            stbi_load(roughnessTexturePath, &texWidth, &texHeight,
-                      &texChannels, STBI_rgb_alpha);
-
-        if (!pixels)
-        {
-            printf(
-                "SK ERROR: Failed to load roughness texture image.");
-            pixels = stbi_load("res/textures/default_roughness.bmp",
-                               &texWidth, &texHeight, &texChannels,
-                               STBI_rgb_alpha);
-        }
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-        VkBuffer       imageStagingBuffer;
-        VkDeviceMemory imageStagingBufferMemory;
-
-        skRenderer_CreateBuffer(
-            renderer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &imageStagingBuffer, &imageStagingBufferMemory);
-
-        void* imageData;
-        vkMapMemory(renderer->device, imageStagingBufferMemory, 0,
-                    imageSize, 0, &imageData);
-        memcpy(imageData, pixels, imageSize);
-        vkUnmapMemory(renderer->device, imageStagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        skRenderer_CreateImage(
-            renderer, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &obj.roughnessImage,
-            &obj.roughnessImageMemory);
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        skRenderer_CopyBufferToImage(
-            renderer, imageStagingBuffer, obj.roughnessImage,
-            (u32)(texWidth), (u32)(texHeight));
-
-        skRenderer_TransitionImageLayout(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        obj.roughnessImageView = skRenderer_CreateImageView(
-            renderer, obj.roughnessImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkSamplerCreateInfo samplerInfo = {0};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(renderer->device, &samplerInfo, NULL,
-                            &obj.roughnessSampler) != VK_SUCCESS)
-        {
-            printf("SK ERROR: Failed to create normal sampler.");
-        }
-    }
-
-    return obj;
-}
-
-skLineObject skLineObject_Create(skRenderer* renderer, vec3* points,
-                                 u32* indices, u32 pointCount,
-                                 u32 indexCount, vec3 color,
-                                 float width)
-{
-    skLineObject line = {0};
-    line.vertexCount = pointCount;
-    line.indexCount = indexCount;
-    line.lineWidth = width;
-    glm_vec3_copy(color, line.color);
-
-    size_t bufferSize = sizeof(vec3) * pointCount;
-
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &stagingBuffer, &stagingMemory);
-
-    void* data;
-    vkMapMemory(renderer->device, stagingMemory, 0, bufferSize, 0,
-                &data);
-    memcpy(data, points, bufferSize);
-    vkUnmapMemory(renderer->device, stagingMemory);
-
-    skRenderer_CreateBuffer(renderer, bufferSize,
-                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &line.vertexBuffer,
-                            &line.vertexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, stagingBuffer, line.vertexBuffer,
-                          bufferSize);
-
-    vkDestroyBuffer(renderer->device, stagingBuffer, NULL);
-    vkFreeMemory(renderer->device, stagingMemory, NULL);
-
-    size_t         indexBufferSize = sizeof(u32) * indexCount;
-    VkBuffer       indexStagingBuffer;
-    VkDeviceMemory indexStagingMemory;
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                            &indexStagingBuffer, &indexStagingMemory);
-
-    void* indexData;
-    vkMapMemory(renderer->device, indexStagingMemory, 0,
-                indexBufferSize, 0, &indexData);
-    memcpy(indexData, indices, indexBufferSize);
-    vkUnmapMemory(renderer->device, indexStagingMemory);
-
-    skRenderer_CreateBuffer(renderer, indexBufferSize,
-                            VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            &line.indexBuffer,
-                            &line.indexBufferMemory);
-
-    skRenderer_CopyBuffer(renderer, indexStagingBuffer,
-                          line.indexBuffer, indexBufferSize);
-
-    vkDestroyBuffer(renderer->device, indexStagingBuffer, NULL);
-    vkFreeMemory(renderer->device, indexStagingMemory, NULL);
-
-    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
-    {
-        skRenderer_CreateBuffer(
-            renderer, sizeof(skUniformBufferObject),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &line.uniformBuffers[frame],
-            &line.uniformBuffersMemory[frame]);
-
-        vkMapMemory(renderer->device,
-                    line.uniformBuffersMemory[frame], 0,
-                    sizeof(skUniformBufferObject), 0,
-                    &line.uniformBuffersMap[frame]);
-    }
-
-    VkDescriptorSetLayout layouts[SK_FRAMES_IN_FLIGHT];
-    for (int i = 0; i < SK_FRAMES_IN_FLIGHT; i++)
-    {
-        layouts[i] = renderer->descriptorSetLayout;
-    }
-
-    VkDescriptorSetAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = renderer->descriptorPool;
-    allocInfo.descriptorSetCount = SK_FRAMES_IN_FLIGHT;
-    allocInfo.pSetLayouts = layouts;
-
-    if (vkAllocateDescriptorSets(renderer->device, &allocInfo,
-                                 line.descriptorSets) != VK_SUCCESS)
-    {
-        printf("SK ERROR: Failed to allocate descriptor sets for "
-               "object.");
-    }
-
-    // Update descriptor sets
-    for (int frame = 0; frame < SK_FRAMES_IN_FLIGHT; frame++)
-    {
-        VkDescriptorBufferInfo bufferInfo = {0};
-        bufferInfo.buffer = line.uniformBuffers[frame];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(skUniformBufferObject);
-
-        VkWriteDescriptorSet descriptorWrites[] = {{0}};
-
-        descriptorWrites[0].sType =
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = line.descriptorSets[frame];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType =
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        vkUpdateDescriptorSets(renderer->device, 1, descriptorWrites,
-                               0, NULL);
-    }
-
-    glm_mat4_identity(line.transform);
-
-    return line;
-}
-
-void skRenderer_AddLineObject(skRenderer*   renderer,
-                              skLineObject* line)
-{
-    skVector_PushBack(renderer->lineObjects, line);
 }

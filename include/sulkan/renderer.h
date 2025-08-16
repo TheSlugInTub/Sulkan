@@ -15,7 +15,7 @@
 #include <sulkan/ecs_api.h>
 
 #define SK_FRAMES_IN_FLIGHT   (2)
-#define SK_MAX_RENDER_OBJECTS (1000)
+#define SK_MAX_RENDER_OBJECTS (20)
 #define SK_MAX_BONES (100)
 
 typedef struct skSwapchainDetails
